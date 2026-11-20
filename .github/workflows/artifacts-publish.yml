@@ -174,7 +174,6 @@ jobs:
   # THE SOURCE IS THE PUBLISHER'S OWN PACKAGE for both rows. `sequoia` was mirrored from THIS
   # repository before (it had been copied here once by hand); pulling both from `easydiskbake` makes
   # the two rows the same shape and leaves one origin for every Apple image.
-jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 120
