@@ -55,6 +55,7 @@ jobs:
     uses: easydev-org/easyvm/.github/workflows/stage.yml@main
     secrets: inherit
     with:
+      image_repository: easydev-org/easyvm
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
       stages: |
@@ -90,6 +91,7 @@ jobs:
     uses: easydev-org/easyvm/.github/workflows/stage.yml@main
     secrets: inherit
     with:
+      image_repository: easydev-org/easyvm
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
       stages: |
@@ -111,6 +113,7 @@ jobs:
     uses: easydev-org/easyvm/.github/workflows/stage.yml@main
     secrets: inherit
     with:
+      image_repository: easydev-org/easyvm
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
       stages: |
@@ -132,6 +135,7 @@ jobs:
     uses: easydev-org/easyvm/.github/workflows/stage.yml@main
     secrets: inherit
     with:
+      image_repository: easydev-org/easyvm
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
       stages: |
