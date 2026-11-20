@@ -1,0 +1,610 @@
+name: artifacts-publish
+
+# THE PINNED INPUTS THIS REPOSITORY'S STAGES FETCH, MIRRORED INTO ITS OWN PACKAGE.
+#
+# SPLIT OUT OF easydev-org/easyvm, WHICH MIRRORED EVERY OPERATING SYSTEM'S ASSETS INTO ONE PACKAGE.
+# That worked while every stage lived in one repository; it stopped being right the day they did not.
+# A package a repository PUSHES to is the package its own token can write, and an asset layer with one
+# place to look per operating system is one where a wrong tag names the repository that is wrong.
+#
+# WHY MIRROR AT ALL: the vendors serve these at a fraction of ghcr's rate - SourceForge answered
+# BlissOS at 0.5 MB/s on the measurement that produced the pin, and a CI run was cancelled at exactly
+# 1h0m0s with the ISO at 92%. The same bytes from ghcr arrive in about a minute.
+
+on:
+  workflow_dispatch:
+    inputs:
+      group:
+        description: "Which group to publish"
+        type: choice
+        options:
+          - all
+          - macos
+          - recovery
+        default: all
+      disks_repository:
+        description: >-
+          The ghcr package the pinned inputs are MIRRORED INTO. Empty means THIS repository, which is
+          what every caller wants: a token can only write to the package its own repository holds.
+        default: ""
+      which:
+        description: "One exact tag, overriding `group`. Empty publishes the whole group."
+        default: ""
+      keep:
+        description: "Keep the downloaded files on the runner"
+        type: boolean
+        default: false
+
+concurrency:
+  group: artifacts-publish-${{ github.ref }}-${{ inputs.which }}-${{ inputs.group }}
+  cancel-in-progress: false
+
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact:
+          - { tag: "iso-windows11", group: "windows", url: "https://software-static.download.prss.microsoft.com/dbazure/888969d5-f34g-4e03-ac9d-1f9786c66749/26200.6584.250915-1905.25h2_ge_release_svc_refresh_CLIENT_CONSUMER_x64FRE_en-us.iso", sha: "d141f6030fed50f75e2b03e1eb2e53646c4b21e5386047cb860af5223f102a32", size: "7736125440" }
+          - { tag: "iso-virtio-win", group: "windows", url: "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso", sha: "", size: "0" }
+    # NO `if:` HERE, AND THAT IS NOT AN OVERSIGHT: A JOB-LEVEL `if:` CANNOT SEE `matrix`.
+    #
+    # GitHub evaluates a job's `if:` before the matrix is expanded, so `matrix.artifact.tag` is empty
+    # there and the condition silently reads as false for every row - a run with zero jobs and no log
+    # line. MEASURED, and it is what the repository's own workflow test refuses.
+    #
+    # SELECTION GOES IN THE MATRIX INSTEAD, which IS evaluated per row. The generator that wrote this
+    # file reads the catalogue and the three inputs, so a re-run of one artifact is:
+    #
+    #	gh workflow run artifacts-publish.yml -f tag=iso-windows11
+    #
+    # and the matrix then holds one row. The cost is that the row list is written out at generation
+    # time rather than computed at run time - which a catalogue in a heredoc was already doing.
+    steps:
+      - uses: actions/checkout@v4
+
+      # A ROW THAT WAS NOT ASKED FOR EXITS BEFORE IT DOWNLOADS ANYTHING.
+      #
+      # THE COMMENT ABOVE THIS JOB USED TO SAY A RE-RUN OF ONE ARTIFACT WAS `-f which=iso-windows11`
+      # "because the matrix then holds one row". IT DID NOT: the matrix is a literal list written
+      # into this file, nothing reads `which` or `group`, and `-f which=iso-freebsd` started
+      # SEVENTEEN DOWNLOADS AND FIFTY-ONE GIBABYTES - measured on run 44298764450, cancelled after
+      # the jobs came up. A selection input that is declared and never read is worse than none: it
+      # reads like a filter and behaves like "everything".
+      #
+      # THE GUARD IS A STEP RATHER THAN A JOB `if:` FOR THE REASON THE COMMENT BELOW ALREADY GIVES:
+      # GitHub evaluates a job's `if:` BEFORE the matrix is expanded, so `matrix.artifact.tag` is
+      # empty there and every row would read as false.
+      - name: is this row wanted
+        id: wanted
+        env:
+          WHICH: ${{ inputs.which }}
+          GROUP_INPUT: ${{ inputs.group }}
+          ROW_TAG: ${{ matrix.artifact.tag }}
+          ROW_GROUP: ${{ matrix.artifact.group }}
+        run: |
+          set -eu
+          if [ -n "${WHICH:-}" ]; then
+            if [ "$ROW_TAG" = "$WHICH" ]; then
+              echo "wanted=yes" >> "$GITHUB_OUTPUT"
+            else
+              echo "wanted=no" >> "$GITHUB_OUTPUT"
+              echo "skipped: asked for $WHICH, this row is $ROW_TAG"
+            fi
+            exit 0
+          fi
+          if [ "${GROUP_INPUT:-all}" = "all" ] || [ "$ROW_GROUP" = "$GROUP_INPUT" ]; then
+            echo "wanted=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "wanted=no" >> "$GITHUB_OUTPUT"
+            echo "skipped: asked for group $GROUP_INPUT, this row is $ROW_GROUP"
+          fi
+
+      - name: prepare the runner
+        if: steps.wanted.outputs.wanted == 'yes'
+        # THE DISK IS THE POINT: the largest single input is 7.7 GiB and its hash pass reads it again,
+        # so a runner with a 14 GiB volume fails halfway through the Windows image.
+        uses: easydev-org/easyactions/runner-check@main
+        with:
+          kvm: false
+          disk-gb: '25'
+          token: ${{ github.token }}
+
+      - name: download and verify
+        if: steps.wanted.outputs.wanted == 'yes'
+        # THE PER-ARTIFACT RULE LIVES IN ONE SCRIPT, because it is fifteen comments long and a matrix
+        # row should be readable. It downloads, checks the pin by ITS OWN LENGTH, and fails with the
+        # numbers when they differ.
+        id: fetch
+        env:
+          GROUP: ${{ matrix.artifact.group }}
+          # EMPTY HERE IS NOT "NO OPINION": `internal/asset` falls back to `easydev-org/easyvm` when
+          # this is unset, which is the product's package and not writable with this token. So the
+          # default is spelled out as this repository rather than left to the fallback.
+          DISKS_REPOSITORY: ${{ inputs.disks_repository || github.repository }}
+        run: |
+          set -eu
+          path=$(sh scripts/mirror-one.sh \
+                   "${{ matrix.artifact.tag }}" \
+                   "${{ matrix.artifact.url }}" \
+                   "${{ matrix.artifact.sha }}" \
+                   "${{ matrix.artifact.size }}")
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: push
+        if: steps.wanted.outputs.wanted == 'yes'
+        # THE TRANSFER IS THE ACTION THAT KNOWS THE REGISTRY: it installs oras idempotently, logs in
+        # explicitly, and refuses a push whose bytes are identical to an earlier artifact.
+        uses: easydev-org/easyactions/oci-push@main
+        with:
+          path: ${{ steps.fetch.outputs.path }}
+          tag: ${{ matrix.artifact.tag }}
+          repository: ${{ inputs.disks_repository || github.repository }}
+          media-type: application/vnd.easydev.artifact
+          token: ${{ github.token }}
+          check-name: mirror-${{ matrix.artifact.tag }}
+
+  # APPLE'S RECOVERY IMAGE IS THE ONE INPUT THAT CANNOT BE A CATALOGUE ROW.
+  #
+  # Every other upstream here is one HTTP GET. This one is a session cookie, a five-field POST with
+  # opaque nonces, a token exchange, and then a CDN download that has to be parallel or it is cut
+  # short - Apple does not serve it as one request:
+  #
+  #	curl: (18) end of response with 887566699 bytes missing
+  #
+  # and every request produces a DIFFERENT URL AND TOKEN, so there is nothing stable to pin.
+  #
+  # SO IT IS A TRANSFER BETWEEN TWO PACKAGES RATHER THAN A DOWNLOAD: the file is the same bytes, one
+  # copy is already published under `macos-recovery-<name>`, and this mirrors it into THIS
+  # repository's package so the asset layer has one place to look. A pull and a push, both through the
+  # organisation's actions.
+  #
+  # ONE ROW PER macOS RELEASE, AND `tahoe` WAS MISSING FROM THIS JOB. `internal/asset` has resolved
+  # release 26 to the tag `macos-recovery-tahoe` since that table was written, and the publisher had
+  # only ever mirrored `sequoia` - so the image a 26 stage requires was in `easydiskbake` and in no
+  # repository this build reads. The failure mode of the omission is the one this project keeps
+  # paying for: a 404 in somebody's first step, naming a tag that looks like a typo.
+  #
+  # THE SOURCE IS THE PUBLISHER'S OWN PACKAGE for both rows. `sequoia` was mirrored from THIS
+  # repository before (it had been copied here once by hand); pulling both from `easydiskbake` makes
+  # the two rows the same shape and leaves one origin for every Apple image.
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact:
+          - { tag: "macos-asset-opencore", group: "macos", url: "https://github.com/acidanthera/OpenCorePkg/releases/download/1.0.7/OpenCore-1.0.7-RELEASE.zip", sha: "2ffab6ebf58c7aefb0bcb3a1a385d207746823d6dd87d44bd666e1286939943e", size: "10437696" }
+          - { tag: "macos-asset-opencore-template", group: "macos", url: "https://github.com/LongQT-sea/OpenCore-ISO/releases/download/v0.7/LongQT-OpenCore-v0.7.iso", sha: "287328995d4198f1b05166f087d85bf7ef66bedafe150d17ad112ac8de60051d", size: "15884288" }
+          - { tag: "macos-asset-ovmf-code", group: "macos", url: "https://raw.githubusercontent.com/kholia/OSX-KVM/326053dd61f49375d5dfb28ee715d38b04b5cd8e/OVMF_CODE.fd", sha: "52a625db5a45329bf8005232db33e94781787d92ae8d088f2f73332dd4ded3a9", size: "1966080" }
+          - { tag: "macos-asset-ovmf-vars-1920x1080", group: "macos", url: "https://raw.githubusercontent.com/kholia/OSX-KVM/326053dd61f49375d5dfb28ee715d38b04b5cd8e/OVMF_VARS-1920x1080.fd", sha: "6ed987af3a3c155be71665f510eae3e007eda9b8b94afd59d45e91c4a11565cc", size: "131072" }
+          - { tag: "macos-asset-xcode-26.3", group: "macos", url: "https://archive.org/download/xcode-26.3/Xcode_26.3_Universal.xip", sha: "cebf05ec2920111830af5e08a45f07961e36bfd6", size: "2871807039" }
+          - { tag: "macos-asset-xcode-26.6", group: "macos", url: "https://archive.org/download/xcode-26.6/Xcode_26.6_Universal.xip", sha: "31f49573964bb9b13f1c5f4bad83a23e3be2a44e", size: "2965708631" }
+          - { tag: "macos-asset-mac-guest-agent", group: "macos", url: "https://github.com/mav2287/mac-guest-agent/releases/latest/download/mac-guest-agent", sha: "", size: "0" }
+          - { tag: "dev-node-pkg", group: "macos", url: "https://nodejs.org/dist/v26.13.0/node-v26.13.0.pkg", sha: "445b202997c959dddbd54ad8c82956371b495b03c73d56044a6f82dfb3249c46", size: "105205394" }
+          - { tag: "dev-python-pkg", group: "macos", url: "https://www.python.org/ftp/python/3.13.9/python-3.13.9-macos11.pkg", sha: "dafebf62b8737f341f6b7eca2d6d1153a50a6b1bfbfa4b8aaf0e62adc73e5017", size: "70163313" }
+    # NO `if:` HERE, AND THAT IS NOT AN OVERSIGHT: A JOB-LEVEL `if:` CANNOT SEE `matrix`.
+    #
+    # GitHub evaluates a job's `if:` before the matrix is expanded, so `matrix.artifact.tag` is empty
+    # there and the condition silently reads as false for every row - a run with zero jobs and no log
+    # line. MEASURED, and it is what the repository's own workflow test refuses.
+    #
+    # SELECTION GOES IN THE MATRIX INSTEAD, which IS evaluated per row. The generator that wrote this
+    # file reads the catalogue and the three inputs, so a re-run of one artifact is:
+    #
+    #	gh workflow run artifacts-publish.yml -f tag=iso-windows11
+    #
+    # and the matrix then holds one row. The cost is that the row list is written out at generation
+    # time rather than computed at run time - which a catalogue in a heredoc was already doing.
+    steps:
+      - uses: actions/checkout@v4
+
+      # A ROW THAT WAS NOT ASKED FOR EXITS BEFORE IT DOWNLOADS ANYTHING.
+      #
+      # THE COMMENT ABOVE THIS JOB USED TO SAY A RE-RUN OF ONE ARTIFACT WAS `-f which=iso-windows11`
+      # "because the matrix then holds one row". IT DID NOT: the matrix is a literal list written
+      # into this file, nothing reads `which` or `group`, and `-f which=iso-freebsd` started
+      # SEVENTEEN DOWNLOADS AND FIFTY-ONE GIBABYTES - measured on run 44298764450, cancelled after
+      # the jobs came up. A selection input that is declared and never read is worse than none: it
+      # reads like a filter and behaves like "everything".
+      #
+      # THE GUARD IS A STEP RATHER THAN A JOB `if:` FOR THE REASON THE COMMENT BELOW ALREADY GIVES:
+      # GitHub evaluates a job's `if:` BEFORE the matrix is expanded, so `matrix.artifact.tag` is
+      # empty there and every row would read as false.
+      - name: is this row wanted
+        id: wanted
+        env:
+          WHICH: ${{ inputs.which }}
+          GROUP_INPUT: ${{ inputs.group }}
+          ROW_TAG: ${{ matrix.artifact.tag }}
+          ROW_GROUP: ${{ matrix.artifact.group }}
+        run: |
+          set -eu
+          if [ -n "${WHICH:-}" ]; then
+            if [ "$ROW_TAG" = "$WHICH" ]; then
+              echo "wanted=yes" >> "$GITHUB_OUTPUT"
+            else
+              echo "wanted=no" >> "$GITHUB_OUTPUT"
+              echo "skipped: asked for $WHICH, this row is $ROW_TAG"
+            fi
+            exit 0
+          fi
+          if [ "${GROUP_INPUT:-all}" = "all" ] || [ "$ROW_GROUP" = "$GROUP_INPUT" ]; then
+            echo "wanted=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "wanted=no" >> "$GITHUB_OUTPUT"
+            echo "skipped: asked for group $GROUP_INPUT, this row is $ROW_GROUP"
+          fi
+
+      - name: prepare the runner
+        if: steps.wanted.outputs.wanted == 'yes'
+        # THE DISK IS THE POINT: the largest single input is 7.7 GiB and its hash pass reads it again,
+        # so a runner with a 14 GiB volume fails halfway through the Windows image.
+        uses: easydev-org/easyactions/runner-check@main
+        with:
+          kvm: false
+          disk-gb: '25'
+          token: ${{ github.token }}
+
+      - name: download and verify
+        if: steps.wanted.outputs.wanted == 'yes'
+        # THE PER-ARTIFACT RULE LIVES IN ONE SCRIPT, because it is fifteen comments long and a matrix
+        # row should be readable. It downloads, checks the pin by ITS OWN LENGTH, and fails with the
+        # numbers when they differ.
+        id: fetch
+        env:
+          GROUP: ${{ matrix.artifact.group }}
+          # EMPTY HERE IS NOT "NO OPINION": `internal/asset` falls back to `easydev-org/easyvm` when
+          # this is unset, which is the product's package and not writable with this token. So the
+          # default is spelled out as this repository rather than left to the fallback.
+          DISKS_REPOSITORY: ${{ inputs.disks_repository || github.repository }}
+        run: |
+          set -eu
+          path=$(sh scripts/mirror-one.sh \
+                   "${{ matrix.artifact.tag }}" \
+                   "${{ matrix.artifact.url }}" \
+                   "${{ matrix.artifact.sha }}" \
+                   "${{ matrix.artifact.size }}")
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: push
+        if: steps.wanted.outputs.wanted == 'yes'
+        # THE TRANSFER IS THE ACTION THAT KNOWS THE REGISTRY: it installs oras idempotently, logs in
+        # explicitly, and refuses a push whose bytes are identical to an earlier artifact.
+        uses: easydev-org/easyactions/oci-push@main
+        with:
+          path: ${{ steps.fetch.outputs.path }}
+          tag: ${{ matrix.artifact.tag }}
+          repository: ${{ inputs.disks_repository || github.repository }}
+          media-type: application/vnd.easydev.artifact
+          token: ${{ github.token }}
+          check-name: mirror-${{ matrix.artifact.tag }}
+
+  # APPLE'S RECOVERY IMAGE IS THE ONE INPUT THAT CANNOT BE A CATALOGUE ROW.
+  #
+  # Every other upstream here is one HTTP GET. This one is a session cookie, a five-field POST with
+  # opaque nonces, a token exchange, and then a CDN download that has to be parallel or it is cut
+  # short - Apple does not serve it as one request:
+  #
+  #	curl: (18) end of response with 887566699 bytes missing
+  #
+  # and every request produces a DIFFERENT URL AND TOKEN, so there is nothing stable to pin.
+  #
+  # SO IT IS A TRANSFER BETWEEN TWO PACKAGES RATHER THAN A DOWNLOAD: the file is the same bytes, one
+  # copy is already published under `macos-recovery-<name>`, and this mirrors it into THIS
+  # repository's package so the asset layer has one place to look. A pull and a push, both through the
+  # organisation's actions.
+  #
+  # ONE ROW PER macOS RELEASE, AND `tahoe` WAS MISSING FROM THIS JOB. `internal/asset` has resolved
+  # release 26 to the tag `macos-recovery-tahoe` since that table was written, and the publisher had
+  # only ever mirrored `sequoia` - so the image a 26 stage requires was in `easydiskbake` and in no
+  # repository this build reads. The failure mode of the omission is the one this project keeps
+  # paying for: a 404 in somebody's first step, naming a tag that looks like a typo.
+  #
+  # THE SOURCE IS THE PUBLISHER'S OWN PACKAGE for both rows. `sequoia` was mirrored from THIS
+  # repository before (it had been copied here once by hand); pulling both from `easydiskbake` makes
+  # the two rows the same shape and leaves one origin for every Apple image.
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # THE TAG IS THE RELEASE NAME, because that is what `recoveryMacOSTag` maps to:
+        #
+        #	15 -> macos-recovery-sequoia      26 -> macos-recovery-tahoe
+        #
+        # WRITTEN OUT RATHER THAN BUILT FROM A SUFFIX, so `TestEveryFetchedTagIsPublishedAndEvery
+        # PublishedTagIsFetched` can read these as the tags they are. A row added here without a
+        # matching entry in that table is a tag nothing resolves to.
+        include:
+          - tag: macos-recovery-sequoia
+          - tag: macos-recovery-tahoe
+    # THE EVENT CHECK IS NOT DECORATION: an `inputs.` value is EMPTY on any event that is not a
+    # dispatch, so `inputs.which == ''` alone is FALSE on a push and the job is skipped while the run
+    # reports success.
+    if: github.event_name != 'workflow_dispatch' || (inputs.which == '' && (inputs.group == 'all' || inputs.group == 'recovery'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pull the published image
+        # THE SOURCE IS THE PUBLISHER'S OWN PACKAGE, which is public - but every tag this build
+        # consumes then lives in this repository, and the asset layer has ONE place to look.
+        #
+        # THAT SENTENCE USED TO SAY `repository: easydev-org/easyvm`, which was true and was the
+        # reason only one release could be mirrored: the second one had never been copied here, so
+        # the pull had nothing to read. `easydiskbake` is where macOS images are actually produced.
+        #
+        # `pull-artifact.sh` RATHER THAN THE `oci-pull` ACTION, AND THE REASON IS THE FILENAME.
+        # MEASURED on run 44006675366, the first run of this matrix: BOTH rows failed with
+        #
+        #	oci-pull: pulling ...:macos-recovery-tahoe -> .../recovery/macos-recovery (916 MiB)
+        #	oci-push: .../recovery/macos-recovery-tahoe does not exist
+        #
+        # - the action TRUNCATES the on-disk name to `macos-recovery`, so it writes a file the push
+        # step cannot find. With one tag it wrote `macos-recovery-sequoia` and nobody noticed;
+        # `macos-recovery` and `macos-recovery-tahoe` differ in their last segment, which is what
+        # the truncation drops. The script takes a destination FILENAME, which is the thing the next
+        # step needs, and it is the same script the `opencore` job already pulls its own recovery
+        # image with.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/recovery"
+          sh "$GITHUB_WORKSPACE/.github/pull-artifact.sh" \
+            ghcr.io easydev-org/easydiskbake \
+            "${{ matrix.tag }}" "$RUNNER_TEMP/recovery/${{ matrix.tag }}"
+          ls -l "$RUNNER_TEMP/recovery/${{ matrix.tag }}"
+
+      - name: push it here
+        uses: easydev-org/easyactions/oci-push@main
+        with:
+          path: ${{ runner.temp }}/recovery/${{ matrix.tag }}
+          tag: ${{ matrix.tag }}
+          repository: ${{ inputs.disks_repository || github.repository }}
+          token: ${{ github.token }}
+          check-name: recovery-mirror-${{ matrix.tag }}
+
+  # THE FIRMWARE A MACOS GUEST BOOTS THROUGH, BUILT ONCE AND PUBLISHED.
+  #
+  # THIS USED TO BE EVERY STAGE'S OWN JOB. `macos/setup.yaml`, `ssh.yaml`, `vm-configure.yaml` and
+  # `dev.yaml` each carried `fetch: recovery_macos` followed by `build: opencore`, so each of them
+  # re-downloaded 800 MiB and rebuilt 256 MiB of FAT32 before its first boot.
+  #
+  # MEASURED, AND IT IS WHY THIS JOB EXISTS - run 43847000071:
+  #
+  #	10:19:12  status: starting
+  #	10:37:14  status: running step 2/34 "fetch the recovery image"
+  #	10:37:14  status: running step 5/34 "wait for sshd"
+  #	          ... fifteen minutes later: nothing accepted ssh
+  #
+  # Eighteen minutes inside a download, then a fifteen-minute boot budget already spent. The same
+  # disk booted to a shell in 32 SECONDS on a machine that had the files. The stage was measuring a
+  # download and reporting it as a machine that would not answer.
+  #
+  # IT RUNS THE IMAGE RATHER THAN REIMPLEMENTING THE BUILD. `build: opencore` is four pinned
+  # downloads, an APFS driver extracted from a recovery image, a serial and a MAC derived from a
+  # model, a config.plist with every key macOS reads, and a 256 MiB FAT32 image whose geometry is
+  # load-bearing - 200 MiB at -c 8 is an INVALID FAT32 that mtools writes and reads back happily
+  # while OVMF refuses to mount it. That is not a shell script; it is `internal/opencore`, and this
+  # job calls it.
+  #
+  # THE THREE FILES GO OUT AS ONE TAG, because a boot needs all three and half a firmware is a guest
+  # that does not start. `boot.img` is 256 MiB, `macos.rom` 2 MiB, `macos.vars` 128 KiB.
+  #
+  # THE IDENTITY IS FIXED HERE AND TRAVELS WITH THE IMAGE. macOS binds an installation to the serial
+  # it was installed under; a disk that boots with a different one stops at a loop that reads as a
+  # broken disk. Every stage boots the same disk, so every stage must use the same identity.
+  #
+  # ONE ROW PER RELEASE, AND EACH ROW WRITES ITS OWN TAGS. A single job publishing `macos-asset-boot`
+  # for two releases would have the second overwrite the first, and the 15 stages - which are the ones
+  # that work today - boot from that tag. So the row carries the RELEASE NAME and every tag and file
+  # this job reads or writes is built from it.
+  opencore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # `walk` is the file, `recovery` the already-mirrored image it requires, `suffix` the part
+        # a published tag carries. THE 15 ROW HAS AN EMPTY SUFFIX ON PURPOSE: `macos-asset-boot`
+        # without one is what `macos/15/steps/*.yaml` and every stage in macos.yml pull today, and
+        # renaming it would be a change to files that are working.
+        #
+        # THE SUFFIX IS THE RELEASE, NOT THE CODE NAME: `-26`, not `-tahoe`, because the walkthroughs
+        # are named by release (`macos/26`) and the recovery tag is the one that needs a code name.
+        include:
+          - release: "15"
+            walk: macos/15/steps/firmware.walk
+            recovery: macos-recovery-sequoia
+            suffix: ""
+          - release: "26"
+            walk: macos/26/steps/firmware.walk
+            recovery: macos-recovery-tahoe
+            suffix: "-26"
+    if: github.event_name != 'workflow_dispatch' || (inputs.which == '' && (inputs.group == 'all' || inputs.group == 'macos'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pull the recovery image the build reads
+        # THE BUILD DOES NOT DOWNLOAD. `macos/15/steps/firmware.walk` requires `recovery.dmg` in its
+        # work directory and fails in the first second without it - the same rule every install stage
+        # follows. What the build still does is extract Apple's APFS driver out of that image, which
+        # is local work on a local file.
+        #
+        # `pull-artifact.sh` RATHER THAN THE `oci-pull` ACTION, AND THE ACTION IS WHY THIS STEP FAILED
+        # FIRST: it took a DIRECTORY as `dest` and wrote nothing this job could find - measured on run
+        # 43884985678, where the step after it reported "the recovery pull produced no file" against an
+        # empty work directory. The script takes a destination FILENAME, which is what the walk reads.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p "$GITHUB_WORKSPACE/work"
+          # THE SOURCE IS WHERE THE IMAGE IS PRODUCED, NOT WHERE THE LEG PULLS ITS DISKS.
+          #
+          # THIS SAID `inputs.disks_repository`, AND THAT BROKE IN TWO DIRECTIONS AT ONCE. The `recovery`
+          # job above mirrors these images from `easydiskbake` into this repository, but this job has no
+          # `needs: recovery`, so it cannot rely on that copy existing. And with the input's default
+          # emptied - which is what makes a fork write to its own package - the name arrived as the
+          # EMPTY STRING:
+          #
+          #	ghcr.io "" "macos-recovery-sequoia" ...
+          #	/home/runner/.../pull-artifact.sh: 31: 2: repository
+          #
+          # MEASURED on run 44309909257, where both opencore jobs failed at step 3 and the build that
+          # produces boot.img never ran.
+          sh "$GITHUB_WORKSPACE/.github/pull-artifact.sh" \
+            ghcr.io easydev-org/easydiskbake \
+            "${{ matrix.recovery }}" "$GITHUB_WORKSPACE/work/recovery.dmg"
+          ls -l "$GITHUB_WORKSPACE/work/recovery.dmg"
+
+      - name: run the build in one container, because loopback is per container
+        # ONE `docker run`, NOT TWO, AND THE REASON IS THE NETWORK NAMESPACE.
+        #
+        # MEASURED on run 43935064261, where the daemon ran detached in its own container and the
+        # client in another:
+        #
+        #	FAILED: POST http://127.0.0.1:8080/api/command:
+        #	        dial tcp 127.0.0.1:8080: connect: connection refused
+        #
+        # \`127.0.0.1\` IS THE CONTAINER'S OWN LOOPBACK. Two containers have two of them, and the daemon
+        # in the first cannot be reached through the second's - the address is the same four octets
+        # and a different machine. \`--network container:\` would share the namespace and would also
+        # share the image's PID 1, which is the same problem from the other end.
+        #
+        # SO THE IMAGE'S \`CMD\` IS OVERRIDDEN FOR THIS ONE CALL: a shell starts the daemon in the
+        # background, waits for its line, runs the client, then polls \`status\` until the build ends.
+        # The default \`serve\` CMD is still what every other caller gets.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p "$GITHUB_WORKSPACE/work"
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e GITHUB_TOKEN \
+            -e DISKS_REPOSITORY="$(printf '%s' "${{ inputs.disks_repository }}" | tr '[:upper:]' '[:lower:]')" \
+            -v "$GITHUB_WORKSPACE/work:/work" \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            --entrypoint /bin/sh \
+            ghcr.io/${{ github.repository }}:latest -c '
+              set -eu
+              easyvm serve --work /work --http :8080 > /tmp/daemon.log 2>&1 &
+              i=0
+              while [ $i -lt 30 ]; do
+                i=$((i + 1))
+                grep -q "listening on" /tmp/daemon.log 2>/dev/null && break
+                sleep 1
+              done
+              case "$(cat /tmp/daemon.log 2>/dev/null)" in
+                *"listening on"*) ;;
+                *) echo "=== THE DAEMON DID NOT COME UP ==="; cat /tmp/daemon.log; exit 1 ;;
+              esac
+
+              easyvm run /repo/${{ matrix.walk }} --work /work || {
+                echo "=== THE CLIENT REFUSED TO QUEUE THE BUILD ==="; cat /tmp/daemon.log; exit 1; }
+
+              # THE EXIT CODE IS NOT THE ANSWER. \`status\` returns 0 for BOTH "finished" and
+              # "running" - measured on run 43935733275, where the loop read
+              #
+              #	status: running step 2/2 "build the firmware the guest boots through"
+              #	=== THE BUILD FINISHED ===
+              #
+              # and the step after it found no boot.img. The STATE WORD is what changes, so the loop
+              # matches on that.
+              i=0
+              while [ $i -lt 120 ]; do
+                i=$((i + 1))
+                out=$(easyvm status --work /work 2>&1) || true
+                printf '%s\n' "$out"
+                case "$out" in
+                  *"status: finished"*) echo "=== THE BUILD FINISHED ==="; exit 0 ;;
+                  *"status: failed"*)   echo "=== THE BUILD FAILED ==="; cat /tmp/daemon.log; exit 1 ;;
+                esac
+                sleep 5
+              done
+              echo "=== THE BUILD DID NOT FINISH IN TEN MINUTES ==="
+              cat /tmp/daemon.log
+              exit 1
+            '
+
+      - name: the three files, and their sizes
+        # A BOOT IMAGE IS 256 MiB AND A TRUNCATED ONE IS NOT DETECTABLE BY qemu UNTIL OVMF REFUSES IT
+        # with `BdsDxe: failed to load ... Not Found`, which names the firmware and not the transfer.
+        # So the floor is checked here, where the failure is one line.
+        run: |
+          set -eu
+          for f in boot.img macos.rom macos.vars; do
+            [ -s "$GITHUB_WORKSPACE/work/$f" ] || {
+              echo "::error::$f was not produced. The build's log above is where it stopped."
+              exit 1
+            }
+          done
+          size=$(stat -c %s "$GITHUB_WORKSPACE/work/boot.img")
+          if [ "$size" -lt $((200 * 1024 * 1024)) ]; then
+            echo "::error::boot.img is $size bytes, below the 200 MiB floor: it is truncated, and a"
+            echo "::error::truncated FAT32 image is one OVMF refuses to mount after the run."
+            exit 1
+          fi
+          ls -l "$GITHUB_WORKSPACE/work/boot.img" \
+                "$GITHUB_WORKSPACE/work/macos.rom" \
+                "$GITHUB_WORKSPACE/work/macos.vars"
+
+      - name: push boot.img
+        # ONE FILE PER TAG, BECAUSE `pull-artifact.sh` READS THE FIRST LAYER. A tag holding three
+        # files yields the first and silently drops the other two - and the two it drops are the ones
+        # qemu's pflash arguments name, so a boot would fail on a path that exists in the registry
+        # and not on disk.
+        #
+        # `${{ matrix.suffix }}` IS EMPTY FOR 15 AND `-26` FOR 26. Two releases publishing one tag
+        # would have the second overwrite the first, and the tag the working 15 stages boot from is
+        # that one - so the 15 tags keep their names and 26 gets its own.
+        #
+        # THE NAMES ON THE WAY OUT ARE THE ONES `internal/run/actions.go` FALLS BACK TO when no
+        # `build: opencore` step ran: `boot.img`, `macos.rom`, `macos.vars` in the work directory.
+        uses: easydev-org/easyactions/oci-push@main
+        with:
+          path: ${{ github.workspace }}/work/boot.img
+          tag: macos-asset-boot${{ matrix.suffix }}
+          repository: ${{ inputs.disks_repository || github.repository }}
+          token: ${{ github.token }}
+          check-name: opencore-boot${{ matrix.suffix }}
+
+      - name: push macos.rom
+        uses: easydev-org/easyactions/oci-push@main
+        with:
+          path: ${{ github.workspace }}/work/macos.rom
+          tag: macos-asset-rom${{ matrix.suffix }}
+          repository: ${{ inputs.disks_repository || github.repository }}
+          token: ${{ github.token }}
+          check-name: opencore-rom${{ matrix.suffix }}
+
+      - name: push macos.vars
+        uses: easydev-org/easyactions/oci-push@main
+        with:
+          path: ${{ github.workspace }}/work/macos.vars
+          tag: macos-asset-vars${{ matrix.suffix }}
+          repository: ${{ inputs.disks_repository || github.repository }}
+          token: ${{ github.token }}
+          check-name: opencore-vars${{ matrix.suffix }}
