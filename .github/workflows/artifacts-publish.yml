@@ -270,11 +270,11 @@ jobs:
         # are named by release (`macos/26`) and the recovery tag is the one that needs a code name.
         include:
           - release: "15"
-            walk: macos/15/steps/firmware.walk
+            walk: 15/steps/firmware.walk
             recovery: macos-recovery-sequoia
             suffix: ""
           - release: "26"
-            walk: macos/26/steps/firmware.walk
+            walk: 26/steps/firmware.walk
             recovery: macos-recovery-tahoe
             suffix: "-26"
     if: github.event_name != 'workflow_dispatch' || (inputs.which == '' && (inputs.group == 'all' || inputs.group == 'macos'))
@@ -343,7 +343,9 @@ jobs:
             -v "$GITHUB_WORKSPACE/work:/work" \
             -v "$GITHUB_WORKSPACE:/repo:ro" \
             --entrypoint /bin/sh \
-            ghcr.io/${{ github.repository }}:latest -c '
+            # THE ENGINE'S IMAGE, NOT THIS REPOSITORY'S. `github.repository` is the CALLER, and this
+            # repository holds walkthroughs and no Go code - so its own package has no `latest`.
+            ghcr.io/easydev-org/easyvm:latest -c '
               set -eu
               easyvm serve --work /work --http :8080 > /tmp/daemon.log 2>&1 &
               i=0
