@@ -63,8 +63,30 @@ walkthrough "macos 26 setup (recovery image to setup assistant)"
   click "agree in the sheet" at 1018 520, waiting 10s, named "agree in the sheet"
   click "select the destination card" at 850 550, waiting 5s, named "select the destination card"
   click destination at 1005 712, waiting 10s, named "destination continue"
+  # THE FIRST COPY NEEDS ABOUT A HUNDRED AND FIVE MINUTES, AND THE BUDGET WAS NINETY.
+  #
+  # MEASURED ON RUN 44924742991, whose recording is the evidence and whose two frames disagree with
+  # each other in a way that names the bug exactly:
+  #
+  #	85 min   "macOS Tahoe will be installed on the disk Untitledmain" - "About 20 minutes remaining"
+  #	141 min  the Apple logo and a progress bar at FOUR PER CENT, on a copy that had restarted
+  #
+  # and whose daemon log says why:
+  #
+  #	loop: 5400s have passed, so the `clock:` actions run
+  #	[easyvm]   resetting the machine
+  #
+  # `max: 270` OF 20-SECOND ATTEMPTS IS 90 MINUTES, AND `every: 5400` IS 90 MINUTES - the loop's own
+  # ceiling and its rescue clock expired at the SAME MINUTE, and the clock reset a guest whose copy was
+  # twenty minutes from finishing. The second attempt then had to start from zero.
+  #
+  # SO THE BUDGET IS LARGER THAN THE MEASUREMENT RATHER THAN EQUAL TO IT: 480 attempts is 160 minutes,
+  # and the clock waits 200 - past the loop's own end, so it cannot fire during a copy that is making
+  # progress. The job's ceiling is 400 minutes, which holds one copy of this size plus the panes after
+  # it. A copy that has genuinely stalled now ends the loop and the reset step below runs, which is
+  # what the clock was for in the first place.
   step "the copy runs, look 1 of at most 8"
-    loop == {check: {from: screen, mode: matches, name: done, pattern: "select your country or region|transfer your information to this mac|choose a wireless network|sign in with your apple id|update mac automatically|choose your look", rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1}, clock: [{click: [731, 547], name: "pick macOS Installer in OpenCore's picker, if that is what is up", settle: 15}, {acpi: reset, name: "reset the guest", timeout: 300}, {name: "give it time to come back", settle: 60}], do: [{settle: 20}, {name: "read the pane for the cancel sheet", see: {name: cancelshot}}, {check: {from: cancelshot, mode: text, name: cancel_sheet, rect: [820, 300, 1100, 600], rect_at: [1920, 1080], scale: 1, words: [[continue, installing]]}, name: "classify - the cancel confirmation"}, {if: cancel_sheet, name: "answer the cancel confirmation", then: [{click: [960, 508], name: "continue installing", settle: 10}]}], every: 5400, max: 270, see: {name: screen}, until: {fact: done}}
+    loop == {check: {from: screen, mode: matches, name: done, pattern: "select your country or region|transfer your information to this mac|choose a wireless network|sign in with your apple id|update mac automatically|choose your look", rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1}, clock: [{click: [731, 547], name: "pick macOS Installer in OpenCore's picker, if that is what is up", settle: 15}, {acpi: reset, name: "reset the guest", timeout: 300}, {name: "give it time to come back", settle: 60}], do: [{settle: 20}, {name: "read the pane for the cancel sheet", see: {name: cancelshot}}, {check: {from: cancelshot, mode: text, name: cancel_sheet, rect: [820, 300, 1100, 600], rect_at: [1920, 1080], scale: 1, words: [[continue, installing]]}, name: "classify - the cancel confirmation"}, {if: cancel_sheet, name: "answer the cancel confirmation", then: [{click: [960, 508], name: "continue installing", settle: 10}]}], every: 12000, max: 480, see: {name: screen}, until: {fact: done}}
   step "reset the guest after look 1, because this installer stalls and a reset is what moves it"
     acpi == reset
     timeout == 300
