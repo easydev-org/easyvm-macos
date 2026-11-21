@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 set -euo pipefail
 
 # THE PASSWORD IS AN ARGUMENT BECAUSE SUDO OVER SSH HAS NO TTY: `sudo` on this channel answers

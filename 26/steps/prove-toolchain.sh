@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 # THE CHECK IS THE PATH, NOT THE VERSION.
 #
 # /usr/bin/python3 exists on every macOS and answers --version perfectly - it is the one

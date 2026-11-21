@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 # PYTHON FROM python.org, macos11 .pkg - the Intel-capable build. It installs into
 # /Library/Frameworks/Python.framework and links python3 into /usr/local/bin.
 set -uo pipefail

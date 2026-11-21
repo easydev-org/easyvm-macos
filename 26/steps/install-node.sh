@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 # NODE FROM nodejs.org, x64 .pkg. The official installer puts it in
 # /usr/local/bin and links node/npm/npx there, which is on the default PATH.
 set -uo pipefail

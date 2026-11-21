@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 set -uo pipefail
 work=$(mktemp -d)
 cat > "$work/hello.swift" <<'SWIFT'
