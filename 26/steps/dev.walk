@@ -47,7 +47,7 @@ walkthrough "macos 26 - developer toolchain"
     scp == [run-xcode-install.sh, /tmp/run-xcode-install.sh]
     timeout == 300
   step "expand and select xcode"
-    ssh == "sh /tmp/run-xcode-install.sh"
+    ssh == "bash /tmp/run-xcode-install.sh"
     timeout == 7200
   step "remove the xip"
     ssh == rm -f /Users/{{ user }}/Xcode.xip && df -h / | tail -1
@@ -71,7 +71,7 @@ walkthrough "macos 26 - developer toolchain"
   # NODE FROM nodejs.org, x64 .pkg. The official installer puts it in /usr/local/bin and links
   # node/npm/npx there, which is on the default PATH.
   step "install node"
-    ssh == "sh /tmp/install-node.sh"
+    ssh == "bash /tmp/install-node.sh"
     timeout == 1800
   step "copy install-python.sh in"
     scp == [install-python.sh, /tmp/install-python.sh]
@@ -79,7 +79,7 @@ walkthrough "macos 26 - developer toolchain"
   # PYTHON FROM python.org, macos11 .pkg - the Intel-capable build. It installs into
   # /Library/Frameworks/Python.framework and links python3 into /usr/local/bin.
   step "install python"
-    ssh == "sh /tmp/install-python.sh"
+    ssh == "bash /tmp/install-python.sh"
     timeout == 1800
   step "copy prove-toolchain.sh in"
     scp == [prove-toolchain.sh, /tmp/prove-toolchain.sh]
@@ -94,7 +94,7 @@ walkthrough "macos 26 - developer toolchain"
   # files and land in /usr/local, while git and the compilers come from Xcode and live under
   # /Applications/Xcode.app or /usr/bin.
   step "prove the toolchain"
-    ssh == "sh /tmp/prove-toolchain.sh"
+    ssh == "bash /tmp/prove-toolchain.sh"
     timeout == 300
   step "prove xcode is selected"
     ssh == xcode-select -p && xcodebuild -version
@@ -103,7 +103,7 @@ walkthrough "macos 26 - developer toolchain"
     scp == [swift-check.sh, /tmp/swift-check.sh]
     timeout == 300
   step "prove swift compiles"
-    ssh == "sh /tmp/swift-check.sh"
+    ssh == "bash /tmp/swift-check.sh"
     timeout == 1800
   step "note what is present"
     ssh == export PATH=/usr/local/bin:$PATH; echo "node=$(node --version)"; echo "python=$(python3 --version)"; echo "git=$(git --version)"; echo "swift=$(swift --version 2>&1 | head -1)"; echo "xcode=$(xcodebuild -version | head -1)"
