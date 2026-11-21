@@ -139,7 +139,7 @@ jobs:
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
-      disk_gb: "25"
+      disk_gb: "70"
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
       stages: |
