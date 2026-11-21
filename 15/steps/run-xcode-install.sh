@@ -24,10 +24,17 @@ echo "PATH ok; xip at $(command -v xip)"
 
 # THE PASSWORD IS AN ARGUMENT BECAUSE SUDO OVER SSH HAS NO TTY: `sudo` on this channel answers
 # "a password is required" and has nowhere to read it from.
-PASSWORD='{{ password }}'
+# THE PASSWORD COMES FROM THE ARGUMENT, BECAUSE THIS FILE IS COPIED VERBATIM.
+#
+# MEASURED ON RUN 44900459640: `/tmp/run-xcode-install.sh: line 30: user: command not found`.
+# The engine renders `{{ }}` in the walk file, NOT in a file a `scp:` carries - so the placeholder
+# arrived at the guest as the literal text `{{ user }}` and bash read `user` as a command. The
+# variable is now an argument and the home directory is `$HOME`, which is the same value without
+# anybody having to substitute it.
+PASSWORD="${1:-}"
 XIP=/tmp/Xcode.xip
 DEST=/Applications
-WORK=/Users/{{ user }}/xcode-expand
+WORK="$HOME/xcode-expand"
 
 # `xip -x` WRITES THE EXPANDED BUNDLE BESIDE A DIRECTORY, so the working directory decides
 # where 15 GiB lands. It goes in the user's home, not /tmp, whose volume is small on macOS.

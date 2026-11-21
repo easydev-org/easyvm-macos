@@ -25,7 +25,7 @@ walkthrough "macos 15 - developer toolchain"
     scp == [run-xcode-install.sh, /tmp/run-xcode-install.sh]
     timeout == 300
   step "expand and select xcode"
-    ssh == "bash /tmp/run-xcode-install.sh"
+    ssh == "bash /tmp/run-xcode-install.sh '{{ password }}'"
     timeout == 7200
   step "remove the xip"
     ssh == rm -f /Users/{{ user }}/Xcode.xip && df -h / | tail -1
@@ -54,13 +54,13 @@ walkthrough "macos 15 - developer toolchain"
     scp == [install-node.sh, /tmp/install-node.sh]
     timeout == 300
   step "install node"
-    ssh == "bash /tmp/install-node.sh"
+    ssh == "bash /tmp/install-node.sh '{{ password }}'"
     timeout == 1800
   step "copy install-python.sh in"
     scp == [install-python.sh, /tmp/install-python.sh]
     timeout == 300
   step "install python"
-    ssh == "bash /tmp/install-python.sh"
+    ssh == "bash /tmp/install-python.sh '{{ password }}'"
     timeout == 1800
   step "copy prove-toolchain.sh in"
     scp == [prove-toolchain.sh, /tmp/prove-toolchain.sh]
