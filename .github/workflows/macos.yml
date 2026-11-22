@@ -65,7 +65,7 @@ jobs:
             "name": "macos-setup",
             "file": "15/steps/setup.walk",
             "pull": "",
-            "assets": ["macos-recovery-sequoia:recovery.dmg", "macos-asset-boot:boot.img", "macos-asset-rom:macos.rom", "macos-asset-vars:macos.vars"],
+            "assets": ["macos-recovery-sequoia:recovery.dmg"],
             "out": "macos15.qcow2",
             "publish": "macos15",
             "timeout": 150
@@ -102,7 +102,7 @@ jobs:
             "name": "macos-ssh",
             "file": "15/steps/ssh.walk",
             "pull": "macos15",
-            "assets": ["macos-asset-boot:boot.img", "macos-asset-rom:macos.rom", "macos-asset-vars:macos.vars"],
+            "assets": [],
             "out": "macos15-ssh.qcow2",
             "publish": "macos15-ssh",
             "timeout": 120
@@ -125,7 +125,7 @@ jobs:
             "name": "macos-vm-configure",
             "file": "15/steps/vm-configure.walk",
             "pull": "macos15-ssh",
-            "assets": ["macos-asset-boot:boot.img", "macos-asset-rom:macos.rom", "macos-asset-vars:macos.vars", "macos-asset-mac-guest-agent:mac-guest-agent"],
+            "assets": ["macos-asset-mac-guest-agent:mac-guest-agent"],
             "out": "macos15-vm-configure.qcow2",
             "publish": "macos15-vm-configure",
             "timeout": 60
@@ -148,7 +148,7 @@ jobs:
             "name": "macos-dev",
             "file": "15/steps/dev.walk",
             "pull": "macos15-vm-configure",
-            "assets": ["macos-asset-boot:boot.img", "macos-asset-rom:macos.rom", "macos-asset-vars:macos.vars", "macos-asset-xcode-26.3:Xcode_26.3_Universal.xip", "dev-node-pkg:node.pkg", "dev-python-pkg:python.pkg"],
+            "assets": ["macos-asset-xcode-26.3:Xcode_26.3_Universal.xip", "dev-node-pkg:node.pkg", "dev-python-pkg:python.pkg"],
             "out": "macos15-dev.qcow2",
             "publish": "macos15-dev",
             "timeout": 90

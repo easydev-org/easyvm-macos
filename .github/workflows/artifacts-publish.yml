@@ -268,28 +268,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # `walk` is the file, `recovery` the already-mirrored image it requires, `suffix` the part
-        # a published tag carries. THE 15 ROW HAS AN EMPTY SUFFIX ON PURPOSE: `macos-asset-boot`
-        # without one is what `15/steps/*.walk` and every stage in macos.yml pull today, and
-        # renaming it would be a change to files that are working.
+        # `recovery` is the already-mirrored image the build extracts Apple's APFS driver from, and
+        # `release` is BOTH the macOS version and the tag suffix: the artifact is
+        # `macos-firmware-15` / `macos-firmware-26`, which is what internal/asset.firmwareTag builds.
         #
-        # THE SUFFIX IS THE RELEASE, NOT THE CODE NAME: `-26`, not `-tahoe`, because the walkthroughs
-        # are named by release (`macos/26`) and the recovery tag is the one that needs a code name.
+        # THE RELEASE, NOT THE CODE NAME: `26`, not `tahoe`, because the walkthroughs are named by
+        # release (`macos/26`) and the recovery tag is the one that needs a code name.
         include:
           - release: "15"
-            walk: 15/steps/firmware.walk
             recovery: macos-recovery-sequoia
-            suffix: ""
           - release: "26"
-            walk: 26/steps/firmware.walk
             recovery: macos-recovery-tahoe
-            suffix: "-26"
     if: github.event_name != 'workflow_dispatch' || (inputs.which == '' && (inputs.group == 'all' || inputs.group == 'macos'))
     steps:
       - uses: actions/checkout@v4
 
       - name: pull the recovery image the build reads
-        # THE BUILD DOES NOT DOWNLOAD. `macos/15/steps/firmware.walk` requires `recovery.dmg` in its
+        # THE BUILD DOES NOT DOWNLOAD. `scripts/build-firmware.py` requires `recovery.dmg` in its
         # work directory and fails in the first second without it - the same rule every install stage
         # follows. What the build still does is extract Apple's APFS driver out of that image, which
         # is local work on a local file.
@@ -321,77 +316,46 @@ jobs:
             "${{ matrix.recovery }}" "$GITHUB_WORKSPACE/work/recovery.dmg"
           ls -l "$GITHUB_WORKSPACE/work/recovery.dmg"
 
-      - name: run the build in one container, because loopback is per container
-        # ONE `docker run`, NOT TWO, AND THE REASON IS THE NETWORK NAMESPACE.
+      - name: pull the four pinned inputs the build reads
+        # FOUR DOWNLOADS, EACH RESUMABLE. `pull-artifact.sh` and not `oras pull`, for the reason the
+        # script's own header records: oras has no resume, and a reset blob starts again from zero.
         #
-        # MEASURED on run 43935064261, where the daemon ran detached in its own container and the
-        # client in another:
-        #
-        #	FAILED: POST http://127.0.0.1:8080/api/command:
-        #	        dial tcp 127.0.0.1:8080: connect: connection refused
-        #
-        # \`127.0.0.1\` IS THE CONTAINER'S OWN LOOPBACK. Two containers have two of them, and the daemon
-        # in the first cannot be reached through the second's - the address is the same four octets
-        # and a different machine. \`--network container:\` would share the namespace and would also
-        # share the image's PID 1, which is the same problem from the other end.
-        #
-        # SO THE IMAGE'S \`CMD\` IS OVERRIDDEN FOR THIS ONE CALL: a shell starts the daemon in the
-        # background, waits for its line, runs the client, then polls \`status\` until the build ends.
-        # The default \`serve\` CMD is still what every other caller gets.
+        # THE RECOVERY IMAGE IS THE FIFTH INPUT AND IT IS PULLED ABOVE, because the build extracts
+        # Apple's APFS driver out of it - local work on a local file, not a download.
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          mkdir -p "$GITHUB_WORKSPACE/work"
-          # THE ENGINE'S IMAGE, NOT THIS REPOSITORY'S. `github.repository` is the CALLER, and this
-          # repository holds walkthroughs and no Go code - so its own package has no `latest`.
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            -e GITHUB_TOKEN \
-            -e DISKS_REPOSITORY="$(printf '%s' "${{ inputs.disks_repository }}" | tr '[:upper:]' '[:lower:]')" \
-            -v "$GITHUB_WORKSPACE/work:/work" \
-            -v "$GITHUB_WORKSPACE:/repo:ro" \
-            --entrypoint /bin/sh \
-            ghcr.io/easydev-org/easyvm:latest -c '
-              set -eu
-              easyvm serve --work /work --http :8080 > /tmp/daemon.log 2>&1 &
-              i=0
-              while [ $i -lt 30 ]; do
-                i=$((i + 1))
-                grep -q "listening on" /tmp/daemon.log 2>/dev/null && break
-                sleep 1
-              done
-              case "$(cat /tmp/daemon.log 2>/dev/null)" in
-                *"listening on"*) ;;
-                *) echo "=== THE DAEMON DID NOT COME UP ==="; cat /tmp/daemon.log; exit 1 ;;
-              esac
+          for pair in \
+            "macos-asset-opencore:opencore.zip" \
+            "macos-asset-opencore-template:opencore-template.iso" \
+            "macos-asset-ovmf-code:OVMF_CODE.fd" \
+            "macos-asset-ovmf-vars-1920x1080:OVMF_VARS-1920x1080.fd"
+          do
+            tag=${pair%%:*}
+            file=${pair#*:}
+            sh "$GITHUB_WORKSPACE/.github/pull-artifact.sh" \
+              ghcr.io easydev-org/easyvm-fork "$tag" "$GITHUB_WORKSPACE/work/$file"
+          done
+          ls -l "$GITHUB_WORKSPACE/work"
 
-              easyvm run /repo/${{ matrix.walk }} --work /work || {
-                echo "=== THE CLIENT REFUSED TO QUEUE THE BUILD ==="; cat /tmp/daemon.log; exit 1; }
-
-              # THE EXIT CODE IS NOT THE ANSWER. \`status\` returns 0 for BOTH "finished" and
-              # "running" - measured on run 43935733275, where the loop read
-              #
-              #	status: running step 2/2 "build the firmware the guest boots through"
-              #	=== THE BUILD FINISHED ===
-              #
-              # and the step after it found no boot.img. The STATE WORD is what changes, so the loop
-              # matches on that.
-              i=0
-              while [ $i -lt 120 ]; do
-                i=$((i + 1))
-                out=$(easyvm status --work /work 2>&1) || true
-                printf '%s\n' "$out"
-                case "$out" in
-                  *"status: finished"*) echo "=== THE BUILD FINISHED ==="; exit 0 ;;
-                  *"status: failed"*)   echo "=== THE BUILD FAILED ==="; cat /tmp/daemon.log; exit 1 ;;
-                esac
-                sleep 5
-              done
-              echo "=== THE BUILD DID NOT FINISH IN TEN MINUTES ==="
-              cat /tmp/daemon.log
-              exit 1
-            '
+      - name: build boot.img from the pinned inputs
+        # THIS IS A PYTHON SCRIPT NOW, NOT A WALKTHROUGH STEP, AND THE REASON IS WHAT THE
+        # BUILD IS. It never boots a guest, never types anything and needs no screen: it unpacks
+        # OpenCore, merges the template, writes a config.plist, extracts apfs.efi and writes a FAT32
+        # ESP with mtools. None of that is a walkthrough step, and running it as one meant a build
+        # failure read like a guest failure.
+        #
+        # THE OUTPUT IS A PURE FUNCTION OF THE FIVE INPUTS, so it is built once here and published -
+        # every macOS stage then downloads three files instead of rebuilding them.
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full mtools
+          python3 "$GITHUB_WORKSPACE/scripts/build-firmware.py" \
+            --assets "$GITHUB_WORKSPACE/work" \
+            --release "${{ matrix.release }}" \
+            --out "$GITHUB_WORKSPACE/work/out"
 
       - name: the three files, and their sizes
         # A BOOT IMAGE IS 256 MiB AND A TRUNCATED ONE IS NOT DETECTABLE BY qemu UNTIL OVMF REFUSES IT
@@ -399,56 +363,48 @@ jobs:
         # So the floor is checked here, where the failure is one line.
         run: |
           set -eu
-          for f in boot.img macos.rom macos.vars; do
-            [ -s "$GITHUB_WORKSPACE/work/$f" ] || {
+          for f in boot.img macos.rom macos.vars.template; do
+            [ -s "$GITHUB_WORKSPACE/work/out/$f" ] || {
               echo "::error::$f was not produced. The build's log above is where it stopped."
               exit 1
             }
           done
-          size=$(stat -c %s "$GITHUB_WORKSPACE/work/boot.img")
+          size=$(stat -c %s "$GITHUB_WORKSPACE/work/out/boot.img")
           if [ "$size" -lt $((200 * 1024 * 1024)) ]; then
             echo "::error::boot.img is $size bytes, below the 200 MiB floor: it is truncated, and a"
             echo "::error::truncated FAT32 image is one OVMF refuses to mount after the run."
             exit 1
           fi
-          ls -l "$GITHUB_WORKSPACE/work/boot.img" \
-                "$GITHUB_WORKSPACE/work/macos.rom" \
-                "$GITHUB_WORKSPACE/work/macos.vars"
+          ls -l "$GITHUB_WORKSPACE/work/out"
 
-      - name: push boot.img
-        # ONE FILE PER TAG, BECAUSE `pull-artifact.sh` READS THE FIRST LAYER. A tag holding three
-        # files yields the first and silently drops the other two - and the two it drops are the ones
-        # qemu's pflash arguments name, so a boot would fail on a path that exists in the registry
-        # and not on disk.
+      - name: pack the three files into one artifact
+        # ONE TAG, ONE BLOB. The registry stores a layer per tag, so three separate tags would be
+        # three pulls on every macOS stage and three chances to be out of step with each other - a
+        # boot.img from release 15 and a macos.rom from 26 is a guest that cannot boot.
+        run: |
+          set -eu
+          cd "$GITHUB_WORKSPACE/work/out"
+          # `macos.vars.template` IS THE NAME IN THE TAR, and the engine copies it to `macos.vars`
+          # per guest: qemu WRITES to that file, so the artifact must carry the untouched template
+          # and never the copy a previous run left behind.
+          tar -cf "$GITHUB_WORKSPACE/work/macos-firmware.tar" \
+            boot.img macos.rom macos.vars.template
+          ls -l "$GITHUB_WORKSPACE/work/macos-firmware.tar"
+
+      - name: push macos-firmware
+        # ONE TAG PER RELEASE, HOLDING ONE TAR WITH THE THREE FILES.
         #
-        # `${{ matrix.suffix }}` IS EMPTY FOR 15 AND `-26` FOR 26. Two releases publishing one tag
-        # would have the second overwrite the first, and the tag the working 15 stages boot from is
-        # that one - so the 15 tags keep their names and 26 gets its own.
+        # THREE TAGS WOULD BE THREE PULLS on every macOS stage, and three chances to be out of step
+        # with each other - a boot.img from release 15 with a macos.rom from 26 is a guest that
+        # cannot boot, and nothing would report it until OVMF did.
         #
-        # THE NAMES ON THE WAY OUT ARE THE ONES `internal/run/actions.go` FALLS BACK TO when no
-        # `build: opencore` step ran: `boot.img`, `macos.rom`, `macos.vars` in the work directory.
+        # THE NAME THE ENGINE PULLS IS `macos-firmware-<release>`, which is what
+        # internal/asset.firmwareTag builds. Renaming one without the other is a stage that finds no
+        # firmware and cannot say why.
         uses: easydev-org/easyactions/oci-push@main
         with:
-          path: ${{ github.workspace }}/work/boot.img
-          tag: macos-asset-boot${{ matrix.suffix }}
+          path: ${{ github.workspace }}/work/macos-firmware.tar
+          tag: macos-firmware-${{ matrix.release }}
           repository: ${{ inputs.disks_repository || github.repository }}
           token: ${{ github.token }}
-          check-name: opencore-boot${{ matrix.suffix }}
-
-      - name: push macos.rom
-        uses: easydev-org/easyactions/oci-push@main
-        with:
-          path: ${{ github.workspace }}/work/macos.rom
-          tag: macos-asset-rom${{ matrix.suffix }}
-          repository: ${{ inputs.disks_repository || github.repository }}
-          token: ${{ github.token }}
-          check-name: opencore-rom${{ matrix.suffix }}
-
-      - name: push macos.vars
-        uses: easydev-org/easyactions/oci-push@main
-        with:
-          path: ${{ github.workspace }}/work/macos.vars
-          tag: macos-asset-vars${{ matrix.suffix }}
-          repository: ${{ inputs.disks_repository || github.repository }}
-          token: ${{ github.token }}
-          check-name: opencore-vars${{ matrix.suffix }}
+          check-name: macos-firmware-${{ matrix.release }}

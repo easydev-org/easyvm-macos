@@ -6,7 +6,12 @@ walkthrough "macos 26 setup (recovery image to setup assistant)"
   var shutdown == {default: kill, from: args.shutdown}
   header recording_resolution == [1920, 1080]
 
-  needs recovery.dmg boot.img macos.rom macos.vars, named "the media this stage boots from is already on disk"
+  needs recovery.dmg, named "the recovery image this stage reads is already on disk"
+  step "the firmware this guest boots through"
+    fetch == opencore
+    recovery == recovery.dmg
+    release == "26"
+
   step "create the empty disk"
     disk == disk.qcow2
     disk_gb == 128

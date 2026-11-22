@@ -6,7 +6,12 @@ walkthrough "macos 15 setup (recovery image to setup assistant)"
   var out == {default: out/macos15.qcow2, from: args.out}
   var shutdown == {default: kill, from: args.shutdown}
 
-  needs recovery.dmg boot.img macos.rom macos.vars, named "the media this stage boots from is already on disk"
+  needs recovery.dmg, named "the recovery image this stage reads is already on disk"
+  step "the firmware this guest boots through"
+    fetch == opencore
+    recovery == recovery.dmg
+    release == "15"
+
   step "create the empty disk"
     disk == disk.qcow2
     disk_gb == 128
