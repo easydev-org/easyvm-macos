@@ -2,7 +2,7 @@ name: macos26
 
 # MACOS 26 (TAHOE), AS A CHAIN THAT TODAY HAS ONE STAGE.
 #
-# THIS FILE EXISTS BECAUSE 26 HAD NO ENTRY POINT AT ALL. `macos/26/steps/` held one file - `resume.yaml`,
+# THIS FILE EXISTS BECAUSE 26 HAD NO ENTRY POINT AT ALL. `26/steps/` held one file - `resume.walk`,
 # which boots a disk that already exists - so nothing ever INSTALLED 26, and the firmware this
 # repository publishes for it (`macos-asset-*-26`) had no consumer. The setup stage below is that
 # consumer, and it is the only stage: 26 has no `ssh` or `vm-configure` walkthrough yet.

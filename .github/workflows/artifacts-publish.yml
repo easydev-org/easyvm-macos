@@ -270,7 +270,7 @@ jobs:
       matrix:
         # `walk` is the file, `recovery` the already-mirrored image it requires, `suffix` the part
         # a published tag carries. THE 15 ROW HAS AN EMPTY SUFFIX ON PURPOSE: `macos-asset-boot`
-        # without one is what `macos/15/steps/*.yaml` and every stage in macos.yml pull today, and
+        # without one is what `15/steps/*.walk` and every stage in macos.yml pull today, and
         # renaming it would be a change to files that are working.
         #
         # THE SUFFIX IS THE RELEASE, NOT THE CODE NAME: `-26`, not `-tahoe`, because the walkthroughs
