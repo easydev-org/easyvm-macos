@@ -56,8 +56,23 @@ walkthrough "macos 26 ssh - the setup assistant, remote login, and a graceful sh
     scale == 2
     settle == 4
     when_not == [log, in, to, this, computer]
-  step "the switch reads on"
-    loop == {check: {from: screen, mode: text, name: done, rect: [726, 300, 1200, 715], rect_at: [1920, 1080], scale: 2, words: [[log, in, to, this, computer]]}, do: [{settle: 3}], max: 10, see: {name: screen}, until: {fact: done}}
+  # THE SWITCH IS PROVEN BY sshd ANSWERING, NOT BY A SENTENCE THE READER BREAKS UP.
+  #
+  # MEASURED ON RUN 44970645881, step 16/25, whose own OCR reading of the pane is
+  #
+  #	see: 39 word(s): "Remo To log > h Allow full dis . Sharing Allow acces; ..."
+  #
+  # - that IS the remote-login pane with the switch ON, and its "To log in to this computer remotely,
+  # type ..." line comes back as "To log > h". A check requiring all five words `log in to this
+  # computer` can never hold on a reading like that, so the old loop spent its ten attempts on a
+  # screen that was already correct.
+  #
+  # SO THE SWITCH IS CLICKED HERE, ONCE MORE, TO BE CERTAIN (a toggle already on simply turns off and
+  # the click after it turns it back on), the pane is closed, and `wait for sshd` below is the verdict -
+  # a ten-minute budget against a real connection, which is the only claim here that cannot be misread.
+  step "turn remote login on"
+    click == [1145, 353]
+    settle == 6
   click "close the pane" at 1145 679, waiting 5s, named "close the pane"
   step "wait for sshd"
     require_ssh == true
