@@ -113,10 +113,11 @@ jobs:
   setup:
     needs: room
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos26')
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "25"
       group: macos26
       disks_repository: ${{ inputs.disks_repository }}
@@ -153,10 +154,11 @@ jobs:
     # hours. A FAILED setup is still refused, because then `macos26` points at an older disk and an
     # ssh stage that ran anyway would prove something about a disk nobody asked about.
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos26' || inputs.from_tag == 'macos26-ssh')
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "25"
       group: macos26
       disks_repository: ${{ inputs.disks_repository }}
@@ -186,10 +188,11 @@ jobs:
   vm-configure:
     needs: [room, ssh]
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos26' || inputs.from_tag == 'macos26-ssh' || inputs.from_tag == 'macos26-vm-configure')
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "25"
       group: macos26
       disks_repository: ${{ inputs.disks_repository }}
@@ -227,10 +230,11 @@ jobs:
   dev:
     needs: [room, vm-configure]
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos26' || inputs.from_tag == 'macos26-ssh' || inputs.from_tag == 'macos26-vm-configure' || inputs.from_tag == 'macos26-dev')
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "25"
       group: macos26
       disks_repository: ${{ inputs.disks_repository }}

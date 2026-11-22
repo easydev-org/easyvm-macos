@@ -52,10 +52,11 @@ jobs:
     # published and run the later stages against it, and instead it started a two-hour install that
     # would REPUBLISH the very tag the caller named.
     if: github.event_name != 'workflow_dispatch' || inputs.from_tag == ''
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "25"
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
@@ -89,10 +90,11 @@ jobs:
   ssh:
     needs: [setup]
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos15')
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "25"
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
@@ -112,10 +114,11 @@ jobs:
   vm:
     needs: [ssh]
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos15' || inputs.from_tag == 'macos15-ssh')
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "25"
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
@@ -135,10 +138,11 @@ jobs:
   dev:
     needs: [vm]
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos15' || inputs.from_tag == 'macos15-ssh' || inputs.from_tag == 'macos15-vm-configure')
-    uses: easydev-org/easyvm/.github/workflows/stage.yml@main
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
+      image_tag: v0.0.2
       disk_gb: "70"
       group: macos
       disks_repository: ${{ inputs.disks_repository }}
