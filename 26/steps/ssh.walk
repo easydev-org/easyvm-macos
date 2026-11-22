@@ -1,294 +1,845 @@
 walkthrough "macos 26 ssh - the setup assistant, remote login, and a graceful shutdown"
-  resolution 1920x1080
-  user vmuser
-  # `vmuser` IS THE USER NAME, NOT A PASSWORD, AND IT WAS IN THIS SLOT AS BOTH.
-  #
-  # `{{ password }}` is typed into the account's password field (line ~18's `account password text`)
-  # and into the login window, so a value equal to the account name would be typed as its own
-  # password. macos/15's ssh walk, which RUNS AND PASSES, uses `admin`.
-  password admin
-  var out == {default: out/macos26-ssh.qcow2, from: args.out}
-  var user == {default: vmuser, from: args.user}
-  header boot_disk == from_caller
-  header recording_resolution == [1920, 1080]
-  header ssh_port == 2222
+resolution 1920x1080
+recording_resolution 1920x1080
+user vmuser
+var out
+  default out/macos26-ssh.qcow2
+  from args.out
+# `vmuser` IS THE USER NAME, NOT A PASSWORD, AND IT WAS IN THIS SLOT AS BOTH.
+#
+# `{{ password }}` is typed into the account's password field (line ~18's `account password text`)
+# and into the login window, so a value equal to the account name would be typed as its own
+# password. macos/15's ssh walk, which RUNS AND PASSES, uses `admin`.
+password admin
+var user
+  default vmuser
+  from args.user
+boot_disk from_caller
+ssh_port 2222
+step "the media this stage boots from is already on disk"
+  needs [boot.img, macos.rom, macos.vars]
 
-  needs boot.img macos.rom macos.vars, named "the media this stage boots from is already on disk"
-  step "boot the disk"
-    boot == true
-    memory_mb == 12288
-    os == macos
-    timeout == 900
-  step "answer the wizard until the desktop appears"
-    loop == {check: {from: wizard, mode: text, name: finished, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, without: [continue, back, later], words: [finder]}, do: [{name: "read the pane", see: {name: pane}}, {name: "read the login window's clock", see: {name: clock}}, {check: {from: clock, mode: matches, name: at_login, pattern: "[0-9]+[:.][0-9]+", rect: [820, 90, 1100, 250], rect_at: [1920, 1080], scale: 1}, name: "classify - the login window"}, {check: {from: pane, mode: text, name: country, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[select, your, country, or, region]]}, name: "classify - country or region"}, {check: {from: pane, mode: text, name: transfer, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[transfer, your, information, to, this, mac]]}, name: "classify - transfer"}, {check: {from: pane, mode: text, name: account, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[create, a, mac, account]]}, name: "classify - account"}, {check: {from: pane, mode: text, name: apple_account, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[sign, in, to, your, apple, account]]}, name: "classify - apple account"}, {check: {from: pane, mode: text, name: apple_sheet, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[sure, skip, signing]]}, name: "classify - the apple account sheet"}, {check: {from: pane, mode: text, name: terms, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[terms, conditions]]}, name: "classify - terms"}, {check: {from: pane, mode: text, name: age, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[age, range]]}, name: "classify - age"}, {check: {from: pane, mode: text, name: location, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[enable, location, services]]}, name: "classify - location"}, {check: {from: pane, mode: text, name: location_sheet, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[find, my, available]]}, name: "classify - the location sheet"}, {check: {from: pane, mode: text, name: time_zone, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[time, zone]]}, name: "classify - time zone"}, {check: {from: pane, mode: text, name: analytics, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[share, analytics, with, apple]]}, name: "classify - analytics"}, {check: {from: pane, mode: text, name: privacy_pane, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[privacy, fundamental]]}, name: "classify - data and privacy"}, {check: {from: pane, mode: text, name: languages, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[spoken, languages]]}, name: "classify - spoken languages"}, {check: {from: pane, mode: text, name: accessibility, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[accessibility, individual]]}, name: "classify - accessibility"}, {check: {from: pane, mode: text, name: screen_time, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[screen, time]]}, name: "classify - screen time"}, {check: {from: pane, mode: text, name: filevault, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[ready, encrypting]]}, name: "classify - filevault"}, {check: {from: pane, mode: text, name: filevault_sheet, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[securely, encrypted]]}, name: "classify - the filevault sheet"}, {check: {from: pane, mode: text, name: look, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[choose, your, look]]}, name: "classify - look"}, {check: {from: pane, mode: text, name: update, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[update, mac, automatically]]}, name: "classify - update"}, {check: {from: pane, mode: text, name: keyboard, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[keyboard, assistant]]}, name: "classify - keyboard"}, {if: languages, name: "spoken languages", then: [{click: [1284, 799], name: "languages continue", settle: 7}]}, {if: accessibility, name: accessibility, then: [{click: [1284, 799], name: "accessibility not now", settle: 7}]}, {if: privacy_pane, name: "data and privacy", then: [{click: [1284, 799], name: "privacy continue", settle: 8}]}, {if: transfer, name: "transfer your data", then: [{click: [742, 712], name: "choose not to transfer", settle: 3}, {click: [1284, 799], name: "transfer continue", settle: 8}]}, {if: country, name: "country or region", then: [{click: [900, 470], name: "focus the country list", settle: 2}, {name: "type the country", settle: 3, type: "united states"}, {click: [1284, 799], name: "country continue", settle: 7}]}, {if: account, name: "the account, which is what this whole stage exists for", then: [{click: [959, 496], name: "account full name", settle: 2}, {name: "account full name text", settle: 2, type: "{{ user }}"}, {click: [959, 530], name: "account short name", settle: 2}, {key: meta_l+a, name: "clear the auto-filled short name", settle: 1}, {key: backspace, name: "delete it", settle: 1}, {name: "account short name text", settle: 2, type: "{{ user }}"}, {click: [841, 601], name: "account password", settle: 2}, {name: "account password text", settle: 2, type: "{{ password }}"}, {click: [1068, 601], name: "account verify", settle: 2}, {name: "account verify text", settle: 2, type: "{{ password }}"}, {click: [745, 663], name: "untick the apple account reset", settle: 2}, {click: [1284, 799], name: "account continue", settle: 180}]}, {if: apple_account, name: "apple account - other sign-in options, then later", then: [{click: [620, 800], name: "open other sign-in options", settle: 4}, {click: [682, 853], name: "sign in later", settle: 7}]}, {if: apple_sheet, name: "the apple account confirmation sheet", then: [{click: [1017, 644], name: "skip the apple account", settle: 8}]}, {if: terms, name: "terms and conditions", then: [{click: [1282, 799], name: "terms agree", settle: 7}, {click: [1019, 616], name: "licence agree", settle: 8}]}, {if: age, name: "age range", then: [{click: [959, 710], name: "choose adult", settle: 7}]}, {if: location, name: "location services", then: [{click: [1284, 799], name: "location continue", settle: 7}]}, {if: location_sheet, name: "the location confirmation sheet", then: [{click: [959, 575], name: "dont use location services", settle: 7}]}, {if: time_zone, name: "time zone", then: [{click: [1284, 799], name: "time zone continue", settle: 7}]}, {if: analytics, name: "analytics - untick sharing first", then: [{click: [745, 520], name: "untick share analytics", settle: 2}, {click: [1284, 799], name: "analytics continue", settle: 7}]}, {if: screen_time, name: "screen time", then: [{click: [1131, 799], name: "screen time later", settle: 7}]}, {if: filevault, name: filevault, then: [{click: [1129, 799], name: "filevault not now", settle: 8}]}, {if: filevault_sheet, name: "the filevault confirmation sheet", then: [{click: [1004, 598], name: "continue without filevault", settle: 8}]}, {if: look, name: "choose your look", then: [{click: [1284, 799], name: "look continue", settle: 9}]}, {if: keyboard, name: "the keyboard assistant, which eats the next keystroke", then: [{click: [1228, 826], name: "keyboard quit", settle: 10}]}, {if: update, name: "update mac automatically - reset past it", then: [{acpi: reset, name: "reset the guest", timeout: 300}, {name: "let it come back", settle: 60}]}, {if: at_login, name: "the login window - log in", then: [{click: [960, 983], name: "click the password field", settle: 3}, {name: "type the password", settle: 2, type: "{{ password }}"}, {key: ret, name: "press return", settle: 25}]}], max: 150, see: {name: wizard}, until: {fact: finished}}
-  step "wait for the desktop"
-    loop == {check: {from: desk, mode: text, name: ready, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, without: [continue, back, later], words: [finder]}, do: [{settle: 10}, {key: esc}], max: 30, see: {name: desk}, until: {fact: ready}}
-  press Escape, waiting 2s, named "dismiss anything over the desktop"
-  press meta_l+spc, waiting 4s, named "open spotlight"
-  step "type the settings app name"
-    settle == 7
-    type == system settings
-  press Return, waiting 14s, named "open it"
-  step "the settings window is up"
-    loop == {check: {from: screen, mode: text, name: done, rect: [0, 0, 1920, 1080], rect_at: [1920, 1080], scale: 1, words: [[system, settings], [general], [wi-fi]]}, do: [{settle: 3}], max: 30, see: {name: screen}, until: {fact: done}}
-  # THE SEARCH FIELD IS REACHED WITH Cmd+F, NOT WITH A COORDINATE.
-  #
-  # MEASURED on run 44838865799, whose recording ends with the field EMPTY and the sidebar showing the
-  # full list (General, Displays, Spotlight, Wallpaper, ...) while `Game Center` is highlighted:
-  #
-  #	see: 29 word(s): @ Displays Spotlight «3 Wallpaper O sir Q Notifications 4°) Sound Focus ...
-  #	the remote login result is on screen [check]: done = false (none of "sharing" in ...)
-  #
-  # The click at [715, 267] landed on nothing. That coordinate was measured on an earlier frame, and
-  # the settings window does not open at a fixed position - in this run its search field was at
-  # y 323 and the click went above it, into the title bar. THE COORDINATE WAS THE BUG.
-  #
-  # Cmd+F IS SYSTEM SETTINGS' OWN "FIND" and does not depend on where the window is. And the
-  # Keyboard Setup Assistant was still on screen behind it, so the first thing typed could be eaten:
-  # `type` is retried once the field is open and the assistant closed.
-  step "close the keyboard assistant, if it is still up"
-    loop == {check: {from: screen, mode: text, name: up, rect: [560, 200, 1400, 300], rect_at: [1920, 1080], scale: 1, words: [[keyboard, setup]]}, do: [{click: [666, 259], settle: 3}], max: 3, see: {name: screen}, until: {fact: up}}
-    optional == true
-  # THE SEARCH FIELD IS CLICKED FIRST AND `Cmd+F` IS ONLY THE FALLBACK, BECAUSE `Cmd+F` ALONE HAS
-  # BEEN MEASURED NOT TO WORK ON THIS IMAGE.
-  #
-  # MEASURED on run 44895802436: `Cmd+F` then `type remote login`, and the pane came out as
-  #
-  #	see: 40 word(s): < > | General Manage your overall setup and preferences for Mac, ...
-  #
-  # - General, with the sidebar's full list and an EMPTY search field. The keystrokes went nowhere.
-  # macOS 15's stage reaches this field with a CLICK at (715, 267) and a `meta_l` modifier, and that
-  # image's search does work; this one opens its window at a slightly different height, so the click
-  # is made at the field's own centre and `Cmd+F` is pressed afterwards - one of the two focuses it,
-  # and the check below proves which.
-  step "click the settings search field"
-    click == [715, 322]
-    settle == 3
-  step "and ask the keyboard to focus it too, if the click missed"
-    key == meta_l+f
-    settle == 4
-  # THE SEARCH IS RETRIED, AND EVERY RETRY CLEARS THE FIELD FIRST.
-  #
-  # MEASURED on run 44964926871's final frame - and this one is worth reading closely, because the
-  # stage had already succeeded at the hard part. The search field had FOCUS (its blue ring is drawn)
-  # and its contents were:
-  #
-  #	"emote loginrem ote lom* loginremote loginremate lomote loginn"
-  #
-  # THE RETRY LOOP WAS APPENDING, NOT REPLACING. Each attempt typed `remote login` again at the end of
-  # the last one, so after four attempts the field held the word eight times over, macOS reported
-  #
-  #	No Results for "remote loginremote login..."
-  #
-  # and the check - which was reading a fixed band meant to contain the field - read nothing at all in
-  # this run, because the window sits ~60px lower here than in the frame that band was measured from:
-  #
-  #	[615, 262, 800, 285]   the band that worked on run 44905549978
-  #	the field's real y here   ~322
-  #
-  # SO TWO THINGS ARE FIXED, AND THEY ARE THE SAME LESSON TWICE:
-  #
-  #   1. `Cmd+A` BEFORE EVERY ATTEMPT, so a retry REPLACES the text instead of appending to it.
-  #   2. THE CHECK IS THE RESULT, NOT THE FIELD. "Sharing appears in the sidebar" is the thing the
-  #      stage actually needs, it cannot be satisfied by a mis-typed field, and the sidebar's position
-  #      is stable in a way that a text field's is not.
-  # `clear:` ONLY DOES ANYTHING NEXT TO A `click:`, AND THAT IS AN ENGINE RULE WORTH KNOWING HERE.
-  #
-  # `doType` reads `clear:` inside `if s.Has("click")` - it is the "click the box, select all, type"
-  # sequence, which is what a search field needs. A step with `clear: true` and no `click:` compiles,
-  # passes `easyvm check`, and TYPES WITHOUT CLEARING.
-  step "search for remote login"
-    click == [715, 322]
-    clear == true
-    modifier == meta_l
-    type == remote login
-    settle == 3
-  press Return, waiting 4s, named "run the search"
-  step "the remote login result is on screen"
-    loop == {check: {from: screen, mode: text, name: found, rect: [610, 250, 830, 850], rect_at: [1920, 1080], scale: 1, words: [[sharing]]}, do: [{key: meta_l+a, settle: 1}, {type: remote login, settle: 3}, {key: ret, settle: 4}], max: 4, see: {name: screen}, until: {fact: found}}
-  # THE RESULT IS TWO ROWS UNDER A HEADING, AND [703, 336] LANDED BETWEEN THEM.
-  #
-  # MEASURED on run 44846410525's recording, whose search DID work after `Cmd+F`:
-  #
-  #	[ remote login            ]
-  #	⚙ Sharing                 <- the group heading, y ~364
-  #	    Remote login          <- THE RESULT,        y ~392
-  #
-  # The click at (703, 336) was above the heading, on the empty strip between the search field and the
-  # list, so the window stayed on General - and the next check, which looks for the pane's own
-  # "Allow full disk access" row, spent its whole budget describing General.
-  # THE PANE IS OPENED IN A LOOP, BECAUSE ONE CLICK SELECTS AND ONLY THE PANE'S CONTENTS PROVE IT.
-  #
-  # MEASURED on run 44860489305: one click leaves the row HIGHLIGHTED and the right-hand side still
-  # saying General. MEASURED on run 44865551562: a DOUBLE click leaves the same thing. Both were
-  # single gestures with a fixed wait, and both were wrong about how this list opens.
-  #
-  # SO THE GESTURE IS REPEATED UNTIL THE PANE'S OWN WORDS ARE ON SCREEN, and the loop's condition is
-  # the CONTENT rather than the highlight: "Allow full disk access" is a row inside the pane and
-  # appears nowhere else, so it cannot be satisfied by a selected list row.
-  #
-  # `max: 4` because a list that ignores four clicks is not going to answer a fifth; each attempt
-  # clicks the row and waits for the pane to draw.
-  # SELECTING "REMOTE LOGIN" OPENS THE SHARING OVERVIEW, NOT A REMOTE-LOGIN PANE.
-  #
-  # MEASURED on run 44877397659's recording, whose last ten minutes are this:
-  #
-  #	[ remote login ]        <- the sidebar row, HIGHLIGHTED blue
-  #	                        Sharing
-  #	                        Content & Media
-  #	                          File Sharing          [ off ]
-  #	                          Media Sharing         [ off ]
-  #	                          Screen Sharing        [ off ]
-  #	                          Content Caching       [ off ]
-  #	                        Accessories & Internet
-  #	                          Bluetooth / Printer / Internet Sharing
-  #	                        Advanced
-  #	                          Remote Management     [ off ]
-  #
-  # - the row IS selected and the pane IS "Sharing", but Remote Login is further down that list, out of
-  # view. The previous check demanded "access for remote users", which is a row of the REMOTE LOGIN
-  # section, so it read the overview as "the pane never opened" and clicked the sidebar four times.
-  #
-  # SO THE CHECK ASKS FOR THE OVERVIEW BY ITS OWN HEADING, and the list is then scrolled to the bottom
-  # where Remote Login lives. `content & media` appears on this page and nowhere else in Settings.
-  # THE SIDEBAR ROW SCROLLS THE RIGHT-HAND PAGE TO ITS OWN SECTION; IT DOES NOT OPEN A NEW PAGE.
-  #
-  # MEASURED on run 44947726644's final frame, with `Remote login` HIGHLIGHTED blue in the sidebar and
-  # the pointer resting on it:
-  #
-  #	Sharing
-  #	  Content & Media        File / Media / Screen Sharing, Content Caching
-  #	  Accessories & Internet Bluetooth / Printer / Internet Sharing
-  #	  Advanced               Remote Management
-  #
-  # CLICKING THE SEARCH RESULT OPENS THE DETAIL SHEET ITSELF - NO SCROLLING, NO (i) BUTTON.
-  #
-  # MEASURED ON TWO RUNS, and the second one settles it. Run 44977365817's final frame is this screen:
-  #
-  #	[ remote login                     ]
-  #	  Sharing
-  #	  Remote login                     <- the search result, selected
-  #	
-  #	  [icon] Remote Login: Off                       [ off ]
-  #	         Remote Login lets users of other computers access this
-  #	         computer using SSH and SFTP.
-  #	  Allow full disk access for remote users         [ off ]
-  #	  Allow access for     Only these users
-  #	    Administrators
-  #	                                          [ Done ]
-  #
-  # THE STAGE NEVER PRESSED AN (i) TO GET THIS SHEET. The steps that ran were: click the sidebar row
-  # at (703, 340), then a scroll loop that clicked the scrollbar track ten times. The sheet was already
-  # up before the first of those scroll clicks, which is why its text is what the scroll check kept
-  # reading:
-  #
-  #	page the sharing list to the advanced section [check]: bottom = false
-  #	    (none of "advanced" in "Login: oft oe Er IND RICHIESTE rising SSH ond SFTP ...")
-  #
-  # SO THE MISTAKE WAS TWO-FOLD AND BOTH HALVES WERE MINE:
-  #
-  #   - I read that text as EVIDENCE THAT THE PAGE HAD SCROLLED TO THE ROW. It was the sheet.
-  #   - I then decided the sheet needed to be opened deliberately, with the (i) at (1280, 585), when
-  #     clicking the result had already opened it.
-  #
-  # IN macOS 26 A SEARCH RESULT THAT IS A SECTION OF A PANE OPENS THAT SECTION AS A SHEET over the
-  # pane. That is why every earlier attempt to reach the row by scrolling ended in front of a modal
-  # sheet, and why the "same click, both outcomes" puzzle was never about the click.
-  #
-  # THE SHEET IS ALSO THE BEST TARGET ON THIS SCREEN: `Remote Login: Off` is a sentence, the switch is
-  # in the middle of the display, and the window's own position does not matter.
-  step "open the remote login detail sheet"
-    loop == {check: {from: screen, mode: text, name: sheet, rect: [760, 300, 1200, 480], rect_at: [1920, 1080], scale: 2, words: [[remote, login]]}, do: [{click: [703, 340], settle: 5}], max: 4, see: {name: screen}, until: {fact: sheet}}
-  # ITS SWITCH, MEASURED FROM THE TRACK ITSELF: a white knob (255,255,255) at x 1124..1146 and the
-  # grey track (216..221) at x 1148..1158, inside y 340..356 - centre (1138, 348), knob on the LEFT,
-  # which is OFF.
-  #
-  # IT IS CLICKED ONCE. A retry loop would put it back: the sheet redraws under the pointer and the
-  # second click lands on a switch that has already moved.
-  step "turn remote login on in the sheet"
-    click == [1138, 348]
-    settle == 7
-  # TURNING REMOTE LOGIN ON RAISES AN AUTHORISATION DIALOG, AND THE OLD STEPS WALKED PAST IT.
-  #
-  # MEASURED on run 44679850735's recording, whose last fifty minutes are this one screen:
-  #
-  #	Sharing
-  #	Remote Login is trying to modify system settings.
-  #	Enter your password to allow this.
-  #
-  #	[ vmuser  ]
-  #	[ Password ]          <- the cursor is here
-  #	[ Modify Settings ]   [ Cancel ]
-  #
-  # Clicking the switch does nothing until that dialog is answered, so the switch stayed off, sshd
-  # never started, and `wait for sshd` spent its ten minutes on a closed port. The two steps that
-  # followed were waiting for the words "log in to this computer" - which is what macOS 15's Remote
-  # Login pane says once the switch is ON. This image says it differently, so the check could never
-  # pass and the loop ran its whole budget.
-  #
-  # SO THE DIALOG IS ANSWERED, and the question "did it work" is asked of the SWITCH rather than of a
-  # sentence: after the dialog is accepted the pane shows the remote-login status line, and the old
-  # phrase is kept as an OR because that is what a 15-style pane would show.
-  step "the authorisation dialog is up, if this pane asks for one"
-    loop == {check: {from: screen, mode: text, name: asked, rect: [830, 380, 1200, 730], rect_at: [1920, 1080], scale: 2, words: [[remote, login, is, trying, to, modify]]}, do: [{settle: 2}], max: 6, see: {name: screen}, until: {fact: asked}}
-    optional == true
-  # THE COORDINATES ARE MEASURED FROM THE DIALOG ITSELF, NOT FROM ITS SHAPE.
-  #
-  # From run 44679850735's frame, scanning the pixel colour of the accent button:
-  #
-  #	Password field    y 575..590    (the box above the buttons)
-  #	accent blue       y 620..645    (0,122,255) - that is `Modify Settings`, the default button
-  #	Cancel            y 650..660
-  # THE DIALOG'S PASSWORD FIELD ARRIVES FOCUSED, SO NOTHING IS CLICKED INTO IT.
-  #
-  # MEASURED on run 44679850735's frame: the sheet is
-  #
-  #	Remote Login is trying to modify system settings.
-  #	Enter your password to allow this.
-  #	[ vmuser                 ]
-  #	[ Password               ]   <- the insertion point is already here
-  #	[ Modify Settings ]  [ Cancel ]
-  #
-  # and `Modify Settings` is the ACCENT-BLUE default button (0,122,255). A default button answers
-  # Return. So the sheet is answered by typing the password and pressing Return - two actions that do
-  # not depend on where the window is, which matters because this window is NOT maximised and its
-  # origin shifts between runs.
-  step "type the password into the dialog"
-    when == [asked]
-    type == '{{ password }}'
-    type_gap == 0.10
-    settle == 2
-  step "accept the change"
-    when == [asked]
-    key == ret
-    settle == 8
-  # NO STEP HERE CLAIMS "THE SWITCH IS ON", AND THAT IS DELIBERATE.
-  #
-  # The pane's title is "Remote Login" whether the switch is on or off, and the sentence that used to
-  # be checked ("log in to this computer") is 15's wording for the ON state and does not appear on
-  # this image at all. A check that passes in both states is worse than no check - it reads like
-  # evidence and is not.
-  #
-  # THE PROOF THAT THE SWITCH TOOK IS `wait for sshd` BELOW: sshd is started by that switch and by
-  # nothing else, so a port that answers is the state this step cannot fake.
-  # THE PANE IS NOT CLOSED: `Done` is at a fixed place only while the pane is in the same state, and
-  # nothing after this step needs the window gone. `wait for sshd` reaches the guest over the network,
-  # not through Settings.
-  step "wait for sshd"
-    require_ssh == true
-    timeout == 600
-  step "prove the build over ssh"
-    ssh == sw_vers -productVersion
-  step "prove the account over ssh"
-    ssh == id -un
-  step "prove disk utility works over ssh"
-    ssh == diskutil list | head -5
-  step "name the machine"
-    ssh == printf '%s\n' "{{ password }}" | sudo -S scutil --set LocalHostName {{ user }}
-  step "note what is absent"
-    ssh == command -v brew || true
-  step "stop the machine"
-    shutdown == ssh
-    timeout == 300
-  step "publish the disk"
-    compress == '{{ out }}'
+
+step "boot the disk"
+  boot
+  memory_mb 12288
+  os macos
+  timeout 900
+
+
+step "answer the wizard until the desktop appears"
+  repeat
+    do
+      item "read the pane"
+        read
+          name pane
+      item "read the login window's clock"
+        read
+          name clock
+      item "classify - the login window"
+        check
+          source clock
+          mode matches
+          name at_login
+          pattern "[0-9]+[:.][0-9]+"
+          rect [820, 90, 1100, 250]
+          rect_at [1920, 1080]
+          scale 1
+      item "classify - country or region"
+        check
+          source pane
+          mode text
+          name country
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[select, your, country, or, region]]
+      item "classify - transfer"
+        check
+          source pane
+          mode text
+          name transfer
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[transfer, your, information, to, this, mac]]
+      item "classify - account"
+        check
+          source pane
+          mode text
+          name account
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[create, a, mac, account]]
+      item "classify - apple account"
+        check
+          source pane
+          mode text
+          name apple_account
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[sign, in, to, your, apple, account]]
+      item "classify - the apple account sheet"
+        check
+          source pane
+          mode text
+          name apple_sheet
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[sure, skip, signing]]
+      item "classify - terms"
+        check
+          source pane
+          mode text
+          name terms
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[terms, conditions]]
+      item "classify - age"
+        check
+          source pane
+          mode text
+          name age
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[age, range]]
+      item "classify - location"
+        check
+          source pane
+          mode text
+          name location
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[enable, location, services]]
+      item "classify - the location sheet"
+        check
+          source pane
+          mode text
+          name location_sheet
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[find, my, available]]
+      item "classify - time zone"
+        check
+          source pane
+          mode text
+          name time_zone
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[time, zone]]
+      item "classify - analytics"
+        check
+          source pane
+          mode text
+          name analytics
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[share, analytics, with, apple]]
+      item "classify - data and privacy"
+        check
+          source pane
+          mode text
+          name privacy_pane
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[privacy, fundamental]]
+      item "classify - spoken languages"
+        check
+          source pane
+          mode text
+          name languages
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[spoken, languages]]
+      item "classify - accessibility"
+        check
+          source pane
+          mode text
+          name accessibility
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[accessibility, individual]]
+      item "classify - screen time"
+        check
+          source pane
+          mode text
+          name screen_time
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[screen, time]]
+      item "classify - filevault"
+        check
+          source pane
+          mode text
+          name filevault
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[ready, encrypting]]
+      item "classify - the filevault sheet"
+        check
+          source pane
+          mode text
+          name filevault_sheet
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[securely, encrypted]]
+      item "classify - look"
+        check
+          source pane
+          mode text
+          name look
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[choose, your, look]]
+      item "classify - update"
+        check
+          source pane
+          mode text
+          name update
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[update, mac, automatically]]
+      item "classify - keyboard"
+        check
+          source pane
+          mode text
+          name keyboard
+          rect [0, 0, 1920, 1080]
+          rect_at [1920, 1080]
+          scale 1
+          words [[keyboard, assistant]]
+      item "spoken languages"
+        if languages
+          then
+            item "languages continue"
+              click [1284, 799]
+              settle 7
+      item "accessibility"
+        if accessibility
+          then
+            item "accessibility not now"
+              click [1284, 799]
+              settle 7
+      item "data and privacy"
+        if privacy_pane
+          then
+            item "privacy continue"
+              click [1284, 799]
+              settle 8
+      item "transfer your data"
+        if transfer
+          then
+            item "choose not to transfer"
+              click [742, 712]
+              settle 3
+            item "transfer continue"
+              click [1284, 799]
+              settle 8
+      item "country or region"
+        if country
+          then
+            item "focus the country list"
+              click [900, 470]
+              settle 2
+            item "type the country"
+              settle 3
+              input text "united states"
+            item "country continue"
+              click [1284, 799]
+              settle 7
+      item "the account, which is what this whole stage exists for"
+        if account
+          then
+            item "account full name"
+              click [959, 496]
+              settle 2
+            item "account full name text"
+              settle 2
+              input text "{{ user }}"
+            item "account short name"
+              click [959, 530]
+              settle 2
+            item "clear the auto-filled short name"
+              key meta_l+a
+              settle 1
+            item "delete it"
+              key backspace
+              settle 1
+            item "account short name text"
+              settle 2
+              input text "{{ user }}"
+            item "account password"
+              click [841, 601]
+              settle 2
+            item "account password text"
+              settle 2
+              input text "{{ password }}"
+            item "account verify"
+              click [1068, 601]
+              settle 2
+            item "account verify text"
+              settle 2
+              input text "{{ password }}"
+            item "untick the apple account reset"
+              click [745, 663]
+              settle 2
+            item "account continue"
+              click [1284, 799]
+              settle 180
+      item "apple account - other sign-in options, then later"
+        if apple_account
+          then
+            item "open other sign-in options"
+              click [620, 800]
+              settle 4
+            item "sign in later"
+              click [682, 853]
+              settle 7
+      item "the apple account confirmation sheet"
+        if apple_sheet
+          then
+            item "skip the apple account"
+              click [1017, 644]
+              settle 8
+      item "terms and conditions"
+        if terms
+          then
+            item "terms agree"
+              click [1282, 799]
+              settle 7
+            item "licence agree"
+              click [1019, 616]
+              settle 8
+      item "age range"
+        if age
+          then
+            item "choose adult"
+              click [959, 710]
+              settle 7
+      item "location services"
+        if location
+          then
+            item "location continue"
+              click [1284, 799]
+              settle 7
+      item "the location confirmation sheet"
+        if location_sheet
+          then
+            item "dont use location services"
+              click [959, 575]
+              settle 7
+      item "time zone"
+        if time_zone
+          then
+            item "time zone continue"
+              click [1284, 799]
+              settle 7
+      item "analytics - untick sharing first"
+        if analytics
+          then
+            item "untick share analytics"
+              click [745, 520]
+              settle 2
+            item "analytics continue"
+              click [1284, 799]
+              settle 7
+      item "screen time"
+        if screen_time
+          then
+            item "screen time later"
+              click [1131, 799]
+              settle 7
+      item "filevault"
+        if filevault
+          then
+            item "filevault not now"
+              click [1129, 799]
+              settle 8
+      item "the filevault confirmation sheet"
+        if filevault_sheet
+          then
+            item "continue without filevault"
+              click [1004, 598]
+              settle 8
+      item "choose your look"
+        if look
+          then
+            item "look continue"
+              click [1284, 799]
+              settle 9
+      item "the keyboard assistant, which eats the next keystroke"
+        if keyboard
+          then
+            item "keyboard quit"
+              click [1228, 826]
+              settle 10
+      item "update mac automatically - reset past it"
+        if update
+          then
+            item "reset the guest"
+              acpi reset
+              timeout 300
+            item "let it come back"
+              settle 60
+      item "the login window - log in"
+        if at_login
+          then
+            item "click the password field"
+              click [960, 983]
+              settle 3
+            item "type the password"
+              settle 2
+              input text "{{ password }}"
+            item "press return"
+              key ret
+              settle 25
+    until
+      bind finished
+      source wizard
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      without [continue, back, later]
+      words [finder]
+    max 150
+
+
+step "wait for the desktop"
+  repeat
+    do
+      item
+        settle 10
+      item
+        key esc
+    until
+      bind ready
+      source desk
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      without [continue, back, later]
+      words [finder]
+    max 30
+
+
+step "dismiss anything over the desktop"
+  input esc
+  settle 2
+
+
+step "open spotlight"
+  input meta_l+spc
+  settle 4
+
+
+step "type the settings app name"
+  settle 7
+  input text "system settings"
+
+
+step "open it"
+  input ret
+  settle 14
+
+
+step "the settings window is up"
+  repeat
+    pause 3
+    until
+      bind done
+      source screen
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[system, settings], [general], [wi-fi]]
+    max 30
+# THE SEARCH FIELD IS REACHED WITH Cmd+F, NOT WITH A COORDINATE.
+#
+# MEASURED on run 44838865799, whose recording ends with the field EMPTY and the sidebar showing the
+# full list (General, Displays, Spotlight, Wallpaper, ...) while `Game Center` is highlighted:
+#
+#	see: 29 word(s): @ Displays Spotlight «3 Wallpaper O sir Q Notifications 4°) Sound Focus ...
+#	the remote login result is on screen [check]: done = false (none of "sharing" in ...)
+#
+# The click at [715, 267] landed on nothing. That coordinate was measured on an earlier frame, and
+# the settings window does not open at a fixed position - in this run its search field was at
+# y 323 and the click went above it, into the title bar. THE COORDINATE WAS THE BUG.
+#
+# Cmd+F IS SYSTEM SETTINGS' OWN "FIND" and does not depend on where the window is. And the
+# Keyboard Setup Assistant was still on screen behind it, so the first thing typed could be eaten:
+# `type` is retried once the field is open and the assistant closed.
+
+
+step "close the keyboard assistant, if it is still up"
+  repeat
+    do
+      item
+        click [666, 259]
+        settle 3
+    until
+      bind up
+      source screen
+      mode text
+      rect [560, 200, 1400, 300]
+      rect_at [1920, 1080]
+      scale 1
+      words [[keyboard, setup]]
+    max 3
+  optional
+# THE SEARCH FIELD IS CLICKED FIRST AND `Cmd+F` IS ONLY THE FALLBACK, BECAUSE `Cmd+F` ALONE HAS
+# BEEN MEASURED NOT TO WORK ON THIS IMAGE.
+#
+# MEASURED on run 44895802436: `Cmd+F` then `type remote login`, and the pane came out as
+#
+#	see: 40 word(s): < > | General Manage your overall setup and preferences for Mac, ...
+#
+# - General, with the sidebar's full list and an EMPTY search field. The keystrokes went nowhere.
+# macOS 15's stage reaches this field with a CLICK at (715, 267) and a `meta_l` modifier, and that
+# image's search does work; this one opens its window at a slightly different height, so the click
+# is made at the field's own centre and `Cmd+F` is pressed afterwards - one of the two focuses it,
+# and the check below proves which.
+
+
+step "click the settings search field"
+  input 715 322
+  settle 3
+
+
+step "and ask the keyboard to focus it too, if the click missed"
+  input meta_l+f
+  settle 4
+# THE SEARCH IS RETRIED, AND EVERY RETRY CLEARS THE FIELD FIRST.
+#
+# MEASURED on run 44964926871's final frame - and this one is worth reading closely, because the
+# stage had already succeeded at the hard part. The search field had FOCUS (its blue ring is drawn)
+# and its contents were:
+#
+#	"emote loginrem ote lom* loginremote loginremate lomote loginn"
+#
+# THE RETRY LOOP WAS APPENDING, NOT REPLACING. Each attempt typed `remote login` again at the end of
+# the last one, so after four attempts the field held the word eight times over, macOS reported
+#
+#	No Results for "remote loginremote login..."
+#
+# and the check - which was reading a fixed band meant to contain the field - read nothing at all in
+# this run, because the window sits ~60px lower here than in the frame that band was measured from:
+#
+#	[615, 262, 800, 285]   the band that worked on run 44905549978
+#	the field's real y here   ~322
+#
+# SO TWO THINGS ARE FIXED, AND THEY ARE THE SAME LESSON TWICE:
+#
+#   1. `Cmd+A` BEFORE EVERY ATTEMPT, so a retry REPLACES the text instead of appending to it.
+#   2. THE CHECK IS THE RESULT, NOT THE FIELD. "Sharing appears in the sidebar" is the thing the
+#      stage actually needs, it cannot be satisfied by a mis-typed field, and the sidebar's position
+#      is stable in a way that a text field's is not.
+# `clear:` ONLY DOES ANYTHING NEXT TO A `click:`, AND THAT IS AN ENGINE RULE WORTH KNOWING HERE.
+#
+# `doType` reads `clear:` inside `if s.Has("click")` - it is the "click the box, select all, type"
+# sequence, which is what a search field needs. A step with `clear: true` and no `click:` compiles,
+# passes `easyvm check`, and TYPES WITHOUT CLEARING.
+
+
+step "search for remote login - click the field"
+  input 715 322
+
+
+step "search for remote login - select what is there"
+  input ctrl+a
+  settle 1
+
+
+step "search for remote login - delete the selection"
+  input backspace
+  settle 1
+
+
+step "search for remote login - type the value"
+  input text 
+    modifier meta_l
+  settle 3
+
+
+step "run the search"
+  input ret
+  settle 4
+
+
+step "the remote login result is on screen"
+  repeat
+    do
+      item
+        key meta_l+a
+        settle 1
+      item
+        settle 3
+        input text "remote login"
+      item
+        key ret
+        settle 4
+    until
+      bind found
+      source screen
+      mode text
+      rect [610, 250, 830, 850]
+      rect_at [1920, 1080]
+      scale 1
+      words [[sharing]]
+    max 4
+# THE RESULT IS TWO ROWS UNDER A HEADING, AND [703, 336] LANDED BETWEEN THEM.
+#
+# MEASURED on run 44846410525's recording, whose search DID work after `Cmd+F`:
+#
+#	[ remote login            ]
+#	⚙ Sharing                 <- the group heading, y ~364
+#	    Remote login          <- THE RESULT,        y ~392
+#
+# The click at (703, 336) was above the heading, on the empty strip between the search field and the
+# list, so the window stayed on General - and the next check, which looks for the pane's own
+# "Allow full disk access" row, spent its whole budget describing General.
+# THE PANE IS OPENED IN A LOOP, BECAUSE ONE CLICK SELECTS AND ONLY THE PANE'S CONTENTS PROVE IT.
+#
+# MEASURED on run 44860489305: one click leaves the row HIGHLIGHTED and the right-hand side still
+# saying General. MEASURED on run 44865551562: a DOUBLE click leaves the same thing. Both were
+# single gestures with a fixed wait, and both were wrong about how this list opens.
+#
+# SO THE GESTURE IS REPEATED UNTIL THE PANE'S OWN WORDS ARE ON SCREEN, and the loop's condition is
+# the CONTENT rather than the highlight: "Allow full disk access" is a row inside the pane and
+# appears nowhere else, so it cannot be satisfied by a selected list row.
+#
+# `max: 4` because a list that ignores four clicks is not going to answer a fifth; each attempt
+# clicks the row and waits for the pane to draw.
+# SELECTING "REMOTE LOGIN" OPENS THE SHARING OVERVIEW, NOT A REMOTE-LOGIN PANE.
+#
+# MEASURED on run 44877397659's recording, whose last ten minutes are this:
+#
+#	[ remote login ]        <- the sidebar row, HIGHLIGHTED blue
+#	                        Sharing
+#	                        Content & Media
+#	                          File Sharing          [ off ]
+#	                          Media Sharing         [ off ]
+#	                          Screen Sharing        [ off ]
+#	                          Content Caching       [ off ]
+#	                        Accessories & Internet
+#	                          Bluetooth / Printer / Internet Sharing
+#	                        Advanced
+#	                          Remote Management     [ off ]
+#
+# - the row IS selected and the pane IS "Sharing", but Remote Login is further down that list, out of
+# view. The previous check demanded "access for remote users", which is a row of the REMOTE LOGIN
+# section, so it read the overview as "the pane never opened" and clicked the sidebar four times.
+#
+# SO THE CHECK ASKS FOR THE OVERVIEW BY ITS OWN HEADING, and the list is then scrolled to the bottom
+# where Remote Login lives. `content & media` appears on this page and nowhere else in Settings.
+# THE SIDEBAR ROW SCROLLS THE RIGHT-HAND PAGE TO ITS OWN SECTION; IT DOES NOT OPEN A NEW PAGE.
+#
+# MEASURED on run 44947726644's final frame, with `Remote login` HIGHLIGHTED blue in the sidebar and
+# the pointer resting on it:
+#
+#	Sharing
+#	  Content & Media        File / Media / Screen Sharing, Content Caching
+#	  Accessories & Internet Bluetooth / Printer / Internet Sharing
+#	  Advanced               Remote Management
+#
+# CLICKING THE SEARCH RESULT OPENS THE DETAIL SHEET ITSELF - NO SCROLLING, NO (i) BUTTON.
+#
+# MEASURED ON TWO RUNS, and the second one settles it. Run 44977365817's final frame is this screen:
+#
+#	[ remote login                     ]
+#	  Sharing
+#	  Remote login                     <- the search result, selected
+#
+#	  [icon] Remote Login: Off                       [ off ]
+#	         Remote Login lets users of other computers access this
+#	         computer using SSH and SFTP.
+#	  Allow full disk access for remote users         [ off ]
+#	  Allow access for     Only these users
+#	    Administrators
+#	                                          [ Done ]
+#
+# THE STAGE NEVER PRESSED AN (i) TO GET THIS SHEET. The steps that ran were: click the sidebar row
+# at (703, 340), then a scroll loop that clicked the scrollbar track ten times. The sheet was already
+# up before the first of those scroll clicks, which is why its text is what the scroll check kept
+# reading:
+#
+#	page the sharing list to the advanced section [check]: bottom = false
+#	    (none of "advanced" in "Login: oft oe Er IND RICHIESTE rising SSH ond SFTP ...")
+#
+# SO THE MISTAKE WAS TWO-FOLD AND BOTH HALVES WERE MINE:
+#
+#   - I read that text as EVIDENCE THAT THE PAGE HAD SCROLLED TO THE ROW. It was the sheet.
+#   - I then decided the sheet needed to be opened deliberately, with the (i) at (1280, 585), when
+#     clicking the result had already opened it.
+#
+# IN macOS 26 A SEARCH RESULT THAT IS A SECTION OF A PANE OPENS THAT SECTION AS A SHEET over the
+# pane. That is why every earlier attempt to reach the row by scrolling ended in front of a modal
+# sheet, and why the "same click, both outcomes" puzzle was never about the click.
+#
+# THE SHEET IS ALSO THE BEST TARGET ON THIS SCREEN: `Remote Login: Off` is a sentence, the switch is
+# in the middle of the display, and the window's own position does not matter.
+
+
+step "open the remote login detail sheet"
+  repeat
+    do
+      item
+        click [703, 340]
+        settle 5
+    until
+      bind sheet
+      source screen
+      mode text
+      rect [760, 300, 1200, 480]
+      rect_at [1920, 1080]
+      scale 2
+      words [[remote, login]]
+    max 4
+# ITS SWITCH, MEASURED FROM THE TRACK ITSELF: a white knob (255,255,255) at x 1124..1146 and the
+# grey track (216..221) at x 1148..1158, inside y 340..356 - centre (1138, 348), knob on the LEFT,
+# which is OFF.
+#
+# IT IS CLICKED ONCE. A retry loop would put it back: the sheet redraws under the pointer and the
+# second click lands on a switch that has already moved.
+
+
+step "turn remote login on in the sheet"
+  input 1138 348
+  settle 7
+# TURNING REMOTE LOGIN ON RAISES AN AUTHORISATION DIALOG, AND THE OLD STEPS WALKED PAST IT.
+#
+# MEASURED on run 44679850735's recording, whose last fifty minutes are this one screen:
+#
+#	Sharing
+#	Remote Login is trying to modify system settings.
+#	Enter your password to allow this.
+#
+#	[ vmuser  ]
+#	[ Password ]          <- the cursor is here
+#	[ Modify Settings ]   [ Cancel ]
+#
+# Clicking the switch does nothing until that dialog is answered, so the switch stayed off, sshd
+# never started, and `wait for sshd` spent its ten minutes on a closed port. The two steps that
+# followed were waiting for the words "log in to this computer" - which is what macOS 15's Remote
+# Login pane says once the switch is ON. This image says it differently, so the check could never
+# pass and the loop ran its whole budget.
+#
+# SO THE DIALOG IS ANSWERED, and the question "did it work" is asked of the SWITCH rather than of a
+# sentence: after the dialog is accepted the pane shows the remote-login status line, and the old
+# phrase is kept as an OR because that is what a 15-style pane would show.
+
+
+step "the authorisation dialog is up, if this pane asks for one"
+  repeat
+    pause 2
+    until
+      bind asked
+      source screen
+      mode text
+      rect [830, 380, 1200, 730]
+      rect_at [1920, 1080]
+      scale 2
+      words [[remote, login, is, trying, to, modify]]
+    max 6
+  optional
+# THE COORDINATES ARE MEASURED FROM THE DIALOG ITSELF, NOT FROM ITS SHAPE.
+#
+# From run 44679850735's frame, scanning the pixel colour of the accent button:
+#
+#	Password field    y 575..590    (the box above the buttons)
+#	accent blue       y 620..645    (0,122,255) - that is `Modify Settings`, the default button
+#	Cancel            y 650..660
+# THE DIALOG'S PASSWORD FIELD ARRIVES FOCUSED, SO NOTHING IS CLICKED INTO IT.
+#
+# MEASURED on run 44679850735's frame: the sheet is
+#
+#	Remote Login is trying to modify system settings.
+#	Enter your password to allow this.
+#	[ vmuser                 ]
+#	[ Password               ]   <- the insertion point is already here
+#	[ Modify Settings ]  [ Cancel ]
+#
+# and `Modify Settings` is the ACCENT-BLUE default button (0,122,255). A default button answers
+# Return. So the sheet is answered by typing the password and pressing Return - two actions that do
+# not depend on where the window is, which matters because this window is NOT maximised and its
+# origin shifts between runs.
+
+
+step "type the password into the dialog"
+  settle 2
+  input text "{{ password }}"
+  type_gap 0.1
+  when [asked]
+
+
+step "accept the change"
+  input ret
+  settle 8
+  when [asked]
+# NO STEP HERE CLAIMS "THE SWITCH IS ON", AND THAT IS DELIBERATE.
+#
+# The pane's title is "Remote Login" whether the switch is on or off, and the sentence that used to
+# be checked ("log in to this computer") is 15's wording for the ON state and does not appear on
+# this image at all. A check that passes in both states is worse than no check - it reads like
+# evidence and is not.
+#
+# THE PROOF THAT THE SWITCH TOOK IS `wait for sshd` BELOW: sshd is started by that switch and by
+# nothing else, so a port that answers is the state this step cannot fake.
+# THE PANE IS NOT CLOSED: `Done` is at a fixed place only while the pane is in the same state, and
+# nothing after this step needs the window gone. `wait for sshd` reaches the guest over the network,
+# not through Settings.
+
+
+step "wait for sshd"
+  repeat
+    until machine_ssh
+    max 60
+    pause 10
+
+
+step "prove the build over ssh"
+  ssh "sw_vers -productVersion"
+
+
+step "prove the account over ssh"
+  ssh "id -un"
+
+
+step "prove disk utility works over ssh"
+  ssh "diskutil list | head -5"
+
+
+step "name the machine"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S scutil --set LocalHostName {{ user }}"
+
+
+step "note what is absent"
+  ssh "command -v brew || true"
+
+
+step "stop the machine"
+  stop ssh
+  timeout 300
+
+
+step "publish the disk"
+  save "{{ out }}"
