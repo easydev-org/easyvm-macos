@@ -19,13 +19,11 @@ ssh_port 2222
 step "the media this stage boots from is already on disk"
   needs [boot.img, macos.rom, macos.vars]
 
-
 step "boot the disk"
   boot
   memory_mb 12288
   os macos
   timeout 900
-
 
 step "answer the wizard until the desktop appears"
   repeat
@@ -229,166 +227,166 @@ step "answer the wizard until the desktop appears"
         if languages
           then
             item "languages continue"
-              click [1284, 799]
+              input 1284 799
               settle 7
       item "accessibility"
         if accessibility
           then
             item "accessibility not now"
-              click [1284, 799]
+              input 1284 799
               settle 7
       item "data and privacy"
         if privacy_pane
           then
             item "privacy continue"
-              click [1284, 799]
+              input 1284 799
               settle 8
       item "transfer your data"
         if transfer
           then
             item "choose not to transfer"
-              click [742, 712]
+              input 742 712
               settle 3
             item "transfer continue"
-              click [1284, 799]
+              input 1284 799
               settle 8
       item "country or region"
         if country
           then
             item "focus the country list"
-              click [900, 470]
+              input 900 470
               settle 2
             item "type the country"
               settle 3
               input text "united states"
             item "country continue"
-              click [1284, 799]
+              input 1284 799
               settle 7
       item "the account, which is what this whole stage exists for"
         if account
           then
             item "account full name"
-              click [959, 496]
+              input 959 496
               settle 2
             item "account full name text"
               settle 2
               input text "{{ user }}"
             item "account short name"
-              click [959, 530]
+              input 959 530
               settle 2
             item "clear the auto-filled short name"
-              key meta_l+a
+              input meta_l+a
               settle 1
             item "delete it"
-              key backspace
+              input backspace
               settle 1
             item "account short name text"
               settle 2
               input text "{{ user }}"
             item "account password"
-              click [841, 601]
+              input 841 601
               settle 2
             item "account password text"
               settle 2
               input text "{{ password }}"
             item "account verify"
-              click [1068, 601]
+              input 1068 601
               settle 2
             item "account verify text"
               settle 2
               input text "{{ password }}"
             item "untick the apple account reset"
-              click [745, 663]
+              input 745 663
               settle 2
             item "account continue"
-              click [1284, 799]
+              input 1284 799
               settle 180
       item "apple account - other sign-in options, then later"
         if apple_account
           then
             item "open other sign-in options"
-              click [620, 800]
+              input 620 800
               settle 4
             item "sign in later"
-              click [682, 853]
+              input 682 853
               settle 7
       item "the apple account confirmation sheet"
         if apple_sheet
           then
             item "skip the apple account"
-              click [1017, 644]
+              input 1017 644
               settle 8
       item "terms and conditions"
         if terms
           then
             item "terms agree"
-              click [1282, 799]
+              input 1282 799
               settle 7
             item "licence agree"
-              click [1019, 616]
+              input 1019 616
               settle 8
       item "age range"
         if age
           then
             item "choose adult"
-              click [959, 710]
+              input 959 710
               settle 7
       item "location services"
         if location
           then
             item "location continue"
-              click [1284, 799]
+              input 1284 799
               settle 7
       item "the location confirmation sheet"
         if location_sheet
           then
             item "dont use location services"
-              click [959, 575]
+              input 959 575
               settle 7
       item "time zone"
         if time_zone
           then
             item "time zone continue"
-              click [1284, 799]
+              input 1284 799
               settle 7
       item "analytics - untick sharing first"
         if analytics
           then
             item "untick share analytics"
-              click [745, 520]
+              input 745 520
               settle 2
             item "analytics continue"
-              click [1284, 799]
+              input 1284 799
               settle 7
       item "screen time"
         if screen_time
           then
             item "screen time later"
-              click [1131, 799]
+              input 1131 799
               settle 7
       item "filevault"
         if filevault
           then
             item "filevault not now"
-              click [1129, 799]
+              input 1129 799
               settle 8
       item "the filevault confirmation sheet"
         if filevault_sheet
           then
             item "continue without filevault"
-              click [1004, 598]
+              input 1004 598
               settle 8
       item "choose your look"
         if look
           then
             item "look continue"
-              click [1284, 799]
+              input 1284 799
               settle 9
       item "the keyboard assistant, which eats the next keystroke"
         if keyboard
           then
             item "keyboard quit"
-              click [1228, 826]
+              input 1228 826
               settle 10
       item "update mac automatically - reset past it"
         if update
@@ -402,13 +400,13 @@ step "answer the wizard until the desktop appears"
         if at_login
           then
             item "click the password field"
-              click [960, 983]
+              input 960 983
               settle 3
             item "type the password"
               settle 2
               input text "{{ password }}"
             item "press return"
-              key ret
+              input ret
               settle 25
     until
       bind finished
@@ -419,8 +417,7 @@ step "answer the wizard until the desktop appears"
       scale 1
       without [continue, back, later]
       words [finder]
-    max 150
-
+    max 90
 
 step "wait for the desktop"
   repeat
@@ -428,7 +425,7 @@ step "wait for the desktop"
       item
         settle 10
       item
-        key esc
+        input esc
     until
       bind ready
       source desk
@@ -440,26 +437,21 @@ step "wait for the desktop"
       words [finder]
     max 30
 
-
 step "dismiss anything over the desktop"
   input esc
   settle 2
-
 
 step "open spotlight"
   input meta_l+spc
   settle 4
 
-
 step "type the settings app name"
   settle 7
   input text "system settings"
 
-
 step "open it"
   input ret
   settle 14
-
 
 step "the settings window is up"
   repeat
@@ -473,6 +465,38 @@ step "the settings window is up"
       scale 1
       words [[system, settings], [general], [wi-fi]]
     max 30
+
+# THE WINDOW IS ZOOMED BEFORE ANYTHING IS CLICKED INSIDE IT, AND THAT IS THE FIX FOR THIS STAGE'S
+# WHOLE HISTORY OF COORDINATES THAT WORKED ONCE.
+#
+# EVERY MEASUREMENT FAILURE IN THIS FILE HAS THE SAME SHAPE: a coordinate that was right on the
+# frame it was measured from and wrong on the next run, because System Settings opens at a position
+# and size that vary. The search field was at y 267 in one run and y 323 in another; the results
+# row moved by 50px; the sheet's switch was inside a window that had itself moved. A maximised
+# window does not move.
+#
+# AND THE BUTTON IS FOUND BY COLOUR, NOT BY COORDINATE. macOS draws the three traffic lights in
+# fixed colours - green is rgb(51,198,87) - so `at_color` inside the title bar's own band finds it
+# wherever the window happens to be. MEASURED against a real frame of this screen, three different
+# search bands all returned the same point:
+#
+#	region [600 200 700 245] -> (670,224) ok=true
+#	region [560 180 760 260] -> (670,224) ok=true
+#	region [620 205 700 240] -> (670,224) ok=true
+#	region [600 200 660 245] -> not found        (the red/yellow half - so 40 is not too wide)
+#
+# THE SEARCH BAND IS [560, 170, 780, 280]: tall enough to contain a title bar at any of the heights
+# this window has opened at, and narrow enough to exclude the menu bar's own coloured pixels. Green
+# appears nowhere else in that band.
+#
+# `tolerance 40` because the drawn dot is antialiased; the flat middle is rgb(51,198,87) and the
+# edge is a gradient towards the window's grey.
+step "zoom the settings window by its green button"
+  at_color [51, 198, 87]
+  color_region [560, 170, 780, 280]
+  color_tolerance 40
+  settle 4
+
 # THE SEARCH FIELD IS REACHED WITH Cmd+F, NOT WITH A COORDINATE.
 #
 # MEASURED on run 44838865799, whose recording ends with the field EMPTY and the sidebar showing the
@@ -488,24 +512,31 @@ step "the settings window is up"
 # Cmd+F IS SYSTEM SETTINGS' OWN "FIND" and does not depend on where the window is. And the
 # Keyboard Setup Assistant was still on screen behind it, so the first thing typed could be eaten:
 # `type` is retried once the field is open and the assistant closed.
-
-
 step "close the keyboard assistant, if it is still up"
+  # THE BAND IS THE WHOLE SCREEN, BECAUSE THIS RUNS AFTER THE ZOOM AND THE DIALOG MOVED WITH IT.
+  #
+  # [560, 200, 1400, 300] framed the assistant's title bar on an un-zoomed window; a maximised
+  # desktop puts that dialog wherever the system centres it. `keyboard` + `setup` are two words that
+  # appear together in no other dialog here.
+  #
+  # THE QUIT BUTTON IS REACHED WITH `esc` RATHER THAN A CLICK: the assistant answers Escape, and the
+  # click at (666, 259) was measured against a dialog that is no longer at that position.
   repeat
     do
       item
-        click [666, 259]
+        input esc
         settle 3
     until
       bind up
       source screen
       mode text
-      rect [560, 200, 1400, 300]
+      rect [0, 60, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
       words [[keyboard, setup]]
     max 3
   optional
+
 # THE SEARCH FIELD IS CLICKED FIRST AND `Cmd+F` IS ONLY THE FALLBACK, BECAUSE `Cmd+F` ALONE HAS
 # BEEN MEASURED NOT TO WORK ON THIS IMAGE.
 #
@@ -518,16 +549,20 @@ step "close the keyboard assistant, if it is still up"
 # image's search does work; this one opens its window at a slightly different height, so the click
 # is made at the field's own centre and `Cmd+F` is pressed afterwards - one of the two focuses it,
 # and the check below proves which.
-
-
-step "click the settings search field"
-  input 715 322
-  settle 3
-
-
-step "and ask the keyboard to focus it too, if the click missed"
+# THE SEARCH FIELD IS REACHED WITH Cmd+F AND NOT WITH A COORDINATE, BECAUSE THE WINDOW IS NOW
+# MAXIMISED AND ITS SEARCH FIELD HAS MOVED.
+#
+# MEASURED: on the un-zoomed window the field sat at y 322 (and at y 267 on an earlier run) - the
+# two numbers that produced this stage's only two click-the-field attempts. After the green button
+# is pressed the window fills the screen, so the field is near the TOP and BOTH numbers are wrong.
+# A coordinate measured before a zoom cannot survive the zoom.
+#
+# Cmd+F IS SYSTEM SETTINGS' OWN FIND COMMAND. It does not care where the window is or how big it is,
+# which is exactly the property this stage has been missing.
+step "focus the settings search field"
   input meta_l+f
   settle 4
+
 # THE SEARCH IS RETRIED, AND EVERY RETRY CLEARS THE FIELD FIRST.
 #
 # MEASURED on run 44964926871's final frame - and this one is worth reading closely, because the
@@ -558,54 +593,60 @@ step "and ask the keyboard to focus it too, if the click missed"
 # `doType` reads `clear:` inside `if s.Has("click")` - it is the "click the box, select all, type"
 # sequence, which is what a search field needs. A step with `clear: true` and no `click:` compiles,
 # passes `easyvm check`, and TYPES WITHOUT CLEARING.
-
-
-step "search for remote login - click the field"
-  input 715 322
-
-
-step "search for remote login - select what is there"
-  input ctrl+a
+# `Cmd+A` THEN TYPE, RATHER THAN `clear:` - and this is the engine rule that cost a run.
+#
+# `clear:` ONLY ACTS NEXT TO A `click:` (see `doType`: the flag is read inside `if s.Has("click")`),
+# so a step with `clear: true` and no click types WITHOUT CLEARING. MEASURED on run 44964926871, whose
+# search field held
+#
+#	"emote loginrem ote lom* loginremote loginremate lomote loginn"
+#
+# eight copies of the query, because the retry loop appended each attempt to the last.
+#
+# A `meta_l+a` BEFORE THE TEXT REPLACES IT AND NEEDS NO COORDINATE.
+step "search for remote login"
+  input meta_l+a
   settle 1
 
-
-step "search for remote login - delete the selection"
-  input backspace
-  settle 1
-
-
-step "search for remote login - type the value"
-  input text 
-    modifier meta_l
+step "type the query, replacing whatever was there"
   settle 3
-
+  input text "remote login"
 
 step "run the search"
   input ret
   settle 4
 
-
 step "the remote login result is on screen"
+  # THE BAND IS THE WHOLE LEFT THIRD OF THE SCREEN, TOP TO BOTTOM, BECAUSE THE WINDOW IS ZOOMED.
+  #
+  # The previous band, [610, 250, 830, 850], was measured against the UN-ZOOMED window: its sidebar
+  # began at x 610 and its list at y 250. A maximised System Settings puts the sidebar at the far
+  # left of the display and the list starts near the top, so both edges are wrong now.
+  #
+  # The left third [0, 60, 900, 1050] contains the sidebar of a maximised window at ANY plausible
+  # width, and `sharing` appears in that sidebar and nowhere else on this screen. Excluding the top
+  # 60px skips the menu bar, which carries the clock and Control-Centre glyphs.
   repeat
     do
       item
-        key meta_l+a
+        input meta_l+a
         settle 1
       item
         settle 3
         input text "remote login"
       item
-        key ret
+        input ret
         settle 4
     until
       bind found
       source screen
       mode text
-      rect [610, 250, 830, 850]
+      rect [0, 60, 900, 1050]
       rect_at [1920, 1080]
       scale 1
       words [[sharing]]
     max 4
+
 # THE RESULT IS TWO ROWS UNDER A HEADING, AND [703, 336] LANDED BETWEEN THEM.
 #
 # MEASURED on run 44846410525's recording, whose search DID work after `Cmd+F`:
@@ -697,34 +738,70 @@ step "the remote login result is on screen"
 #
 # THE SHEET IS ALSO THE BEST TARGET ON THIS SCREEN: `Remote Login: Off` is a sentence, the switch is
 # in the middle of the display, and the window's own position does not matter.
-
-
+# THE RESULT IS OPENED WITH RETURN, NOT WITH A CLICK, BECAUSE THE WINDOW IS NOW ZOOMED AND THE
+# ROW'S COORDINATE WAS MEASURED BEFORE THE ZOOM.
+#
+# `click [703, 340]` was right on the un-zoomed window: its sidebar began at x 610 and the search
+# result sat at y 340. A maximised System Settings puts the sidebar at the display's far left and
+# the first result near the top, so BOTH numbers are wrong - the same trap as the search field's
+# y 267 vs y 322, one step later.
+#
+# THE KEYBOARD HAS NO SUCH PROBLEM. The search has just filtered the sidebar, so its first result is
+# already selected; Return opens it. That is the same gesture a person uses, and it does not depend
+# on where the row is drawn.
+#
+# THE LOOP REMAINS because a maximised window occasionally needs the result to be focused first, and
+# `down` moves the selection without committing to a row number.
+# THE RESULT ROW IS CLICKED, AND THE CLICK IS RETRIED UNTIL THE SHEET'S OWN WORDS APPEAR.
+#
+# TWO EARLIER ATTEMPTS FAILED FOR OPPOSITE REASONS, AND BOTH ARE MEASURED:
+#
+#   run 44993137543   `Down` then `Return` - the focus was still in the SEARCH FIELD, so `Down`
+#                     moved a text cursor and `Return` re-ran the search. Nothing opened.
+#   run 44997882247   `at_color [0,98,224]` on the SELECTED row - and by then NOTHING WAS SELECTED.
+#                     Its final frame shows the search field with its blue focus ring, the sidebar
+#                     with `Sharing` and `Remote login` both GREY, and the right-hand pane back on
+#                     General. An earlier `Return` had re-run the search and cleared the selection,
+#                     so the accent-blue the step was looking for had nothing to find.
+#
+# A GATE ON THE SELECTION'S COLOUR IS A GATE ON A STATE THAT THE STEP BEFORE IT CAN DESTROY. What
+# this step wants is the sheet, so the SHEET is the condition, and the action is a click on the row
+# - retried, because the row is drawn in a different place from run to run and a click that lands
+# on the group heading only selects the group.
+#
+# THE ROW'S OWN TEXT WAS MEASURED ON THE FAILING FRAME by stripping 20px bands of the sidebar:
+#
+#	y 130..150   "Sharing"        the group heading
+#	y 160..180   "Remote login"   THE RESULT
+#
+# and the click at (703, 340) this file used to carry was 160px BELOW both of them - measured on a
+# window that opened far lower than this one. The retry means one wrong guess is not fatal.
 step "open the remote login detail sheet"
   repeat
     do
       item
-        click [703, 340]
-        settle 5
+        input 703 170
+        settle 4
     until
       bind sheet
       source screen
       mode text
-      rect [760, 300, 1200, 480]
+      rect [600, 150, 1600, 900]
       rect_at [1920, 1080]
-      scale 2
-      words [[remote, login]]
-    max 4
+      scale 1
+      words [[lets, users, of, other, computers]]
+    max 5
+
 # ITS SWITCH, MEASURED FROM THE TRACK ITSELF: a white knob (255,255,255) at x 1124..1146 and the
 # grey track (216..221) at x 1148..1158, inside y 340..356 - centre (1138, 348), knob on the LEFT,
 # which is OFF.
 #
 # IT IS CLICKED ONCE. A retry loop would put it back: the sheet redraws under the pointer and the
 # second click lands on a switch that has already moved.
-
-
 step "turn remote login on in the sheet"
   input 1138 348
   settle 7
+
 # TURNING REMOTE LOGIN ON RAISES AN AUTHORISATION DIALOG, AND THE OLD STEPS WALKED PAST IT.
 #
 # MEASURED on run 44679850735's recording, whose last fifty minutes are this one screen:
@@ -746,8 +823,15 @@ step "turn remote login on in the sheet"
 # SO THE DIALOG IS ANSWERED, and the question "did it work" is asked of the SWITCH rather than of a
 # sentence: after the dialog is accepted the pane shows the remote-login status line, and the old
 # phrase is kept as an OR because that is what a 15-style pane would show.
-
-
+# THE BAND IS WIDENED, BECAUSE THE WINDOW IS NOW ZOOMED AND THE SHEET IS DRAWN LARGER.
+#
+# [830, 380, 1200, 730] was measured on an un-zoomed window whose sheet was 470px wide. A maximised
+# window centres a wider sheet, so its left edge moves right and its right edge moves right with it.
+# [700, 260, 1500, 900] contains that sheet at any of the sizes this window has been seen at, and
+# `trying to modify` is a sentence that appears in no other dialog on this system.
+#
+# `scale 1` rather than 2: the sentence is 13-point and the 2x upscale was needed only when the band
+# was tight enough to clip it. A wide band already has the pixels.
 step "the authorisation dialog is up, if this pane asks for one"
   repeat
     pause 2
@@ -755,12 +839,13 @@ step "the authorisation dialog is up, if this pane asks for one"
       bind asked
       source screen
       mode text
-      rect [830, 380, 1200, 730]
+      rect [700, 260, 1500, 900]
       rect_at [1920, 1080]
-      scale 2
-      words [[remote, login, is, trying, to, modify]]
+      scale 1
+      words [[trying, to, modify]]
     max 6
   optional
+
 # THE COORDINATES ARE MEASURED FROM THE DIALOG ITSELF, NOT FROM ITS SHAPE.
 #
 # From run 44679850735's frame, scanning the pixel colour of the accent button:
@@ -782,19 +867,36 @@ step "the authorisation dialog is up, if this pane asks for one"
 # Return. So the sheet is answered by typing the password and pressing Return - two actions that do
 # not depend on where the window is, which matters because this window is NOT maximised and its
 # origin shifts between runs.
+# `when:` IS NOT A GATE ON A FACT - IT IS A GATE ON THE SCREEN'S WORDS.
+#
+# MEASURED on run 45003491388, which reached this dialog and stopped in front of it:
+#
+#	=== type the password into the dialog
+#	  ... - when: 126 word(s): & systemSettings Edit View Window Help Q S SunNov 22 1:39AM ...
+#	  skipped: the screen does not say "asked"
+#
+# `asked` WAS TRUE - the loop above had just logged `asked = true (read "trying to modify")` - and
+# the step was skipped anyway, because `when: [asked]` means "the SCREEN says the word asked". The
+# key's own summary says so: "a pane: the words on screen that mean this step applies".
+#
+# `if:` IS THE KEY THAT TESTS A FACT: "run `then:` when this named boolean is true". That is what
+# this needs, and the `then:` list is the two actions the dialog wants.
+#
+# THE PASSWORD FIELD ARRIVES FOCUSED - its insertion point is drawn - and `Modify Settings` is the
+# accent-blue default button, so typing the password and pressing Return answers the sheet. Measured
+# from the frame of THIS run: the field's caret is at (855,584) and `Modify Settings` spans
+# x 845..1074 at y 622..647.
+step "answer the authorisation dialog"
+  if asked
+    then
+      item
+        settle 3
+        input text "{{ password }}"
+        type_gap 0.1
+      item
+        input ret
+        settle 10
 
-
-step "type the password into the dialog"
-  settle 2
-  input text "{{ password }}"
-  type_gap 0.1
-  when [asked]
-
-
-step "accept the change"
-  input ret
-  settle 8
-  when [asked]
 # NO STEP HERE CLAIMS "THE SWITCH IS ON", AND THAT IS DELIBERATE.
 #
 # The pane's title is "Remote Login" whether the switch is on or off, and the sentence that used to
@@ -807,39 +909,31 @@ step "accept the change"
 # THE PANE IS NOT CLOSED: `Done` is at a fixed place only while the pane is in the same state, and
 # nothing after this step needs the window gone. `wait for sshd` reaches the guest over the network,
 # not through Settings.
-
-
 step "wait for sshd"
   repeat
     until machine_ssh
-    max 60
+    max 90
     pause 10
-
+  timeout 600
 
 step "prove the build over ssh"
   ssh "sw_vers -productVersion"
 
-
 step "prove the account over ssh"
   ssh "id -un"
-
 
 step "prove disk utility works over ssh"
   ssh "diskutil list | head -5"
 
-
 step "name the machine"
   ssh "printf '%s\\n' \"{{ password }}\" | sudo -S scutil --set LocalHostName {{ user }}"
-
 
 step "note what is absent"
   ssh "command -v brew || true"
 
-
 step "stop the machine"
   stop ssh
   timeout 300
-
 
 step "publish the disk"
   save "{{ out }}"
