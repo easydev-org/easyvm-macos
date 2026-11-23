@@ -17,8 +17,9 @@ step "the recovery image this stage reads is already on disk"
 
 
 step "create the empty disk"
-  disk disk.qcow2
-  disk_gb 128
+  disk
+    file disk.qcow2
+    size 128
 
 
 step "boot the recovery image"
