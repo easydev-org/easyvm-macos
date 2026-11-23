@@ -350,8 +350,25 @@ step "the copy runs, look 1 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 480
-    nudge 12000
+    # NINETY MINUTES, MEASURED - AND IT WAS TWO HUNDRED, WHICH IS WHY THIS LOOK NEVER RESET AT ALL.
+    #
+    # THE INSTALLER GOES BLACK AND STAYS BLACK FOR TWENTY MINUTES, and that is normal rather than a
+    # stall: it swaps its own graphics stack. MEASURED on this repository's own recording of run
+    # 45189639097 - frames taken every ten minutes from t=1800 to t=6000 showed the progress bar
+    # holding 18 bright pixels, and the OCR reading the whole time was `"e"`. That is the shape
+    # ../../easyvm-26's upstream describes as "about 21 minutes of copying before the screen blanks
+    # on top of the ~21 minutes the countdown still owed, so about 42 minutes to a first draw".
+    #
+    # SO A RESET IS WHAT MOVES IT, AND `nudge 12000` MEANT NO RESET FOR THREE AND A HALF HOURS. The
+    # stage's own `timeout: 180` kills the leg long before that, so look 1 could only ever run out the
+    # job - which is exactly what happened: the run was cancelled at 101 minutes with the bar still at
+    # 18 pixels and the first nudge still two hours away.
+    #
+    # NINETY IS THE UPSTREAM'S NUMBER and it is twice the observed 42-minute first draw, which leaves
+    # a wide margin for a slow runner. The looks after this one keep their ten minutes, because by then
+    # the installer has already been through its graphics swap.
+    max 400
+    nudge 5400
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
         settle 15
