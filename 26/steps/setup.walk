@@ -41,7 +41,12 @@ step "the recovery menu's rows"
 
 step "wait for the recovery menu"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name recovery
     until
       bind done
       source recovery
@@ -118,6 +123,11 @@ step "erase - open the sheet"
         click [1711, 56]
       item
         settle 3
+      item
+        settle 2
+      item "read the screen"
+        read
+          name sheet
     until
       bind sheet_up
       source sheet
@@ -148,7 +158,12 @@ step "erase - confirm"
 
 step "erase - wait for the report"
   repeat
-    pause 5
+    do
+      item
+        settle 5
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -172,7 +187,12 @@ step "close disk utility"
 
 step "the recovery menu is back"
   repeat
-    pause 5
+    do
+      item
+        settle 5
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -196,7 +216,12 @@ step "open the installer"
 
 step "wait for the installer to load"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name instaload
     until
       bind loaded
       source instaload
@@ -215,7 +240,12 @@ step "welcome continue"
 
 step "wait for the licence pane"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name licence
     until
       bind licence_up
       source licence
@@ -234,7 +264,12 @@ step "agree to the licence"
 
 step "wait for the licence sheet"
   repeat
-    pause 5
+    do
+      item
+        settle 5
+      item "read the screen"
+        read
+          name sheet
     until
       bind sheet_up
       source sheet
@@ -309,6 +344,11 @@ step "the copy runs, look 1 of at most 8"
             item "continue installing"
               click [960, 508]
               settle 10
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -336,7 +376,12 @@ step "reset the guest after look 1, because this installer stalls and a reset is
 
 step "wait for the guest to be drawing again after reset 1"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name back1
     until
       bind anything1
       source back1
@@ -356,6 +401,11 @@ step "the copy runs, look 2 of at most 8"
       item "keep the display awake - a bare shift types nothing"
         key shift
         settle 1
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -383,7 +433,12 @@ step "reset the guest after look 2, because this installer stalls and a reset is
 
 step "wait for the guest to be drawing again after reset 2"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name back2
     until
       bind anything2
       source back2
@@ -403,6 +458,11 @@ step "the copy runs, look 3 of at most 8"
       item "keep the display awake - a bare shift types nothing"
         key shift
         settle 1
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -430,7 +490,12 @@ step "reset the guest after look 3, because this installer stalls and a reset is
 
 step "wait for the guest to be drawing again after reset 3"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name back3
     until
       bind anything3
       source back3
@@ -450,6 +515,11 @@ step "the copy runs, look 4 of at most 8"
       item "keep the display awake - a bare shift types nothing"
         key shift
         settle 1
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -477,7 +547,12 @@ step "reset the guest after look 4, because this installer stalls and a reset is
 
 step "wait for the guest to be drawing again after reset 4"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name back4
     until
       bind anything4
       source back4
@@ -497,6 +572,11 @@ step "the copy runs, look 5 of at most 8"
       item "keep the display awake - a bare shift types nothing"
         key shift
         settle 1
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -524,7 +604,12 @@ step "reset the guest after look 5, because this installer stalls and a reset is
 
 step "wait for the guest to be drawing again after reset 5"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name back5
     until
       bind anything5
       source back5
@@ -544,6 +629,11 @@ step "the copy runs, look 6 of at most 8"
       item "keep the display awake - a bare shift types nothing"
         key shift
         settle 1
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -571,7 +661,12 @@ step "reset the guest after look 6, because this installer stalls and a reset is
 
 step "wait for the guest to be drawing again after reset 6"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name back6
     until
       bind anything6
       source back6
@@ -591,6 +686,11 @@ step "the copy runs, look 7 of at most 8"
       item "keep the display awake - a bare shift types nothing"
         key shift
         settle 1
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -618,7 +718,12 @@ step "reset the guest after look 7, because this installer stalls and a reset is
 
 step "wait for the guest to be drawing again after reset 7"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name back7
     until
       bind anything7
       source back7
@@ -638,6 +743,11 @@ step "the copy runs, look 8 of at most 8"
       item "keep the display awake - a bare shift types nothing"
         key shift
         settle 1
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen

@@ -311,6 +311,11 @@ step "answer the wizard until the desktop appears"
             item "update continue"
               input 1306 810
               settle 15
+      item
+        settle 2
+      item "read the screen"
+        read
+          name wizard
     until
       bind finished
       source wizard
@@ -371,6 +376,11 @@ step "wait for the desktop"
         settle 10
       item
         input esc
+      item
+        settle 2
+      item "read the screen"
+        read
+          name desk
     until
       bind ready
       source desk
@@ -404,7 +414,12 @@ step "open it"
 
 step "the settings window is up"
   repeat
-    pause 3
+    do
+      item
+        settle 3
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -449,7 +464,12 @@ step "search for remote login - type the value"
 
 step "the remote login result is on screen"
   repeat
-    pause 2
+    do
+      item
+        settle 2
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -477,7 +497,12 @@ step "open the remote login pane again"
 
 step "the remote login pane is up"
   repeat
-    pause 3
+    do
+      item
+        settle 3
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -499,7 +524,12 @@ step "turn remote login on"
 
 step "the switch reads on"
   repeat
-    pause 3
+    do
+      item
+        settle 3
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen

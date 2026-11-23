@@ -41,7 +41,12 @@ step "the recovery menu's rows"
 
 step "wait for the recovery menu"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name recovery
     until
       bind done
       source recovery
@@ -100,6 +105,11 @@ step "step down to the uninitialised disk"
               key down
             item
               settle 1
+            item
+              settle 2
+            item "read the screen"
+              read
+                name details
           until
             bind uninitialised
             source details
@@ -118,6 +128,11 @@ step "erase - open the sheet"
         click [1681, 57]
       item
         settle 3
+      item
+        settle 2
+      item "read the screen"
+        read
+          name sheet
     until
       bind sheet_up
       source sheet
@@ -147,7 +162,12 @@ step "erase - confirm"
 
 step "erase - wait for the report"
   repeat
-    pause 5
+    do
+      item
+        settle 5
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -170,7 +190,12 @@ step "close disk utility"
 
 step "the recovery menu is back"
   repeat
-    pause 5
+    do
+      item
+        settle 5
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
@@ -193,7 +218,12 @@ step "open the installer"
 
 step "wait for the installer to load"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name instaload
     until
       bind loaded
       source instaload
@@ -211,7 +241,12 @@ step "welcome continue"
 
 step "wait for the licence pane"
   repeat
-    pause 10
+    do
+      item
+        settle 10
+      item "read the screen"
+        read
+          name licence
     until
       bind licence_up
       source licence
@@ -229,7 +264,12 @@ step "agree to the licence"
 
 step "wait for the licence sheet"
   repeat
-    pause 5
+    do
+      item
+        settle 5
+      item "read the screen"
+        read
+          name sheet
     until
       bind sheet_up
       source sheet
@@ -257,7 +297,12 @@ step "destination continue"
 
 step "the copy runs until the Setup Assistant appears"
   repeat
-    pause 20
+    do
+      item
+        settle 20
+      item "read the screen"
+        read
+          name screen
     until
       bind done
       source screen
