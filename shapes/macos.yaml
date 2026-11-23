@@ -8,9 +8,27 @@ name: macos
 description: "OpenCore, Apple's CPU flags, no VGA adapter, USB audio and the SMC key"
 
 firmware:
-  # OPENCORE'S OWN TWO FILES ARE BUILT PER RUN from the recovery image, so they are not named here -
-  # a shape that named them would name a file that does not exist yet.
-  kind: opencore
+  # OPENCORE IS A DIRECTORY THIS BUILD KNOWS NOTHING ABOUT. `fetch: opencore` writes `boot.img`,
+  # `macos.rom` and `macos.vars` into it, and the two lists below say what to DO with them.
+  #
+  # THIS USED TO BE `kind: opencore`, WHICH WAS A GO BRANCH: three fields on the boot spec, two
+  # special cases in `StorageArgs` and one in `FirmwareArgs`, all of it macOS knowledge in a package
+  # that is meant to know only what a shape tells it. The same machine is now data.
+  kind: folder
+  # `fetch: opencore` writes its three files into the WORK DIRECTORY, so `{{work}}` is the directory.
+  dir: "{{work}}"
+
+  # THE TWO PFLASH SLOTS. `readonly=on` for the ROM because qemu must not write to it; the variables
+  # store is per-guest NVRAM and qemu DOES write it, which is why the fetch makes a copy per guest.
+  args:
+    - ["-drive", "if=pflash,format=raw,readonly=on,file={{dir}}/macos.rom"]
+    - ["-drive", "if=pflash,format=raw,file={{dir}}/macos.vars"]
+
+  # OPENCORE'S OWN DISK, FIRST AND WITH `bootindex=0`. "A disk with no bootindex is not in the boot
+  # order at all" - the firmware then reports it could not load Boot0001, six runs in a row.
+  disks:
+    - ["-drive", "file={{dir}}/boot.img,format=raw,if=none,id=oc"]
+    - ["-device", "virtio-blk-pci,drive=oc,bootindex=0"]
 
 # THE CPU FLAG LIST, AND EACH ENTRY IS LOAD-BEARING.
 #
@@ -87,3 +105,27 @@ media:
   iso: false
   iso_reason: "macOS has no install ISO; it installs from its recovery image. Use `recovery:` rather than `iso:`"
   recovery: true
+  # THE POINTER AND THE BUS IT LIVES ON, AND BOTH ARE NEEDED ON EVERY macOS BOOT.
+  #
+  # A MAC HAS NO PS/2, so a pointer that is not on USB is a pointer that does not exist - a macOS
+  # guest booted from an installed disk had NO POINTER AT ALL until this was written, and its first
+  # click died in qemu rather than on the screen:
+  #
+  #	click (965, 981): pointer to (965, 981): Input handler not found for event type abs
+  #
+  # THE BUS IS UNCONDITIONAL and only the image is conditional: the tablet lives on that bus, so it
+  # must exist whether or not a recovery image is attached.
+  # THE BUS AND THE POINTER ARE ATTACHED ON EVERY BOOT, not only an install.
+  #
+  # THEY USED TO LIVE INSIDE THE RECOVERY CONDITIONAL, and that was the bug: a macOS guest booted
+  # from an INSTALLED disk had NO POINTER AT ALL, and its first click died in qemu rather than on
+  # the screen. The controller is first because qemu resolves `bus=xhci.0` as it parses.
+  device_args:
+    - ["-device", "qemu-xhci,id=xhci"]
+    - ["-device", "usb-tablet,bus=xhci.0"]
+    - ["-device", "usb-kbd,bus=xhci.0"]
+  # AND THE IMAGE ITSELF, ONLY WHEN ONE IS ATTACHED. No `bootindex`: the firmware reaches it only
+  # after OpenCore hands over.
+  recovery_args:
+    - ["-drive", "file={{recovery}},media=disk,if=none,id=rec,readonly=on"]
+    - ["-device", "usb-storage,bus=xhci.0,drive=rec"]

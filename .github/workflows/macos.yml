@@ -70,7 +70,7 @@ jobs:
             "name": "macos-setup",
             "file": "15/steps/setup.walk",
             "pull": "",
-            "assets": ["macos-recovery-sequoia:recovery.dmg"],
+            "assets": ["macos-recovery-sequoia:recovery.dmg", "macos-firmware-15:macos-firmware.tar"],
             "out": "macos15.qcow2",
             "publish": "macos15",
             "timeout": 150

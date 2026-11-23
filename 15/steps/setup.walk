@@ -12,7 +12,7 @@ var shutdown
   default kill
   from args.shutdown
 step "the recovery image this stage reads is already on disk"
-  needs [recovery.dmg, boot.img, macos.rom, macos.vars]
+  needs [recovery.dmg, macos-firmware.tar]
 
 
 step "the firmware this guest boots through"
