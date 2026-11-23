@@ -8,27 +8,14 @@ name: macos
 description: "OpenCore, Apple's CPU flags, no VGA adapter, USB audio and the SMC key"
 
 firmware:
-  # OPENCORE IS A DIRECTORY THIS BUILD KNOWS NOTHING ABOUT. `fetch: opencore` writes `boot.img`,
-  # `macos.rom` and `macos.vars` into it, and the two lists below say what to DO with them.
+  # OPENCORE IS A DIRECTORY THIS BUILD KNOWS NOTHING ABOUT. `fetch folder` unpacks it into the work
+  # directory and the profile below says what to do with the files in it.
   #
   # THIS USED TO BE `kind: opencore`, WHICH WAS A GO BRANCH: three fields on the boot spec, two
   # special cases in `StorageArgs` and one in `FirmwareArgs`, all of it macOS knowledge in a package
-  # that is meant to know only what a shape tells it. The same machine is now data.
+  # that is meant to know only what a shape tells it.
   kind: folder
-  # `fetch: opencore` writes its three files into the WORK DIRECTORY, so `{{work}}` is the directory.
   dir: "{{work}}"
-
-  # THE TWO PFLASH SLOTS. `readonly=on` for the ROM because qemu must not write to it; the variables
-  # store is per-guest NVRAM and qemu DOES write it, which is why the fetch makes a copy per guest.
-  args:
-    - ["-drive", "if=pflash,format=raw,readonly=on,file={{dir}}/macos.rom"]
-    - ["-drive", "if=pflash,format=raw,file={{dir}}/macos.vars"]
-
-  # OPENCORE'S OWN DISK, FIRST AND WITH `bootindex=0`. "A disk with no bootindex is not in the boot
-  # order at all" - the firmware then reports it could not load Boot0001, six runs in a row.
-  disks:
-    - ["-drive", "file={{dir}}/boot.img,format=raw,if=none,id=oc"]
-    - ["-device", "virtio-blk-pci,drive=oc,bootindex=0"]
 
 # THE CPU FLAG LIST, AND EACH ENTRY IS LOAD-BEARING.
 #
@@ -48,56 +35,31 @@ smp:
   format: topology
 
 # `none`, BECAUSE ON q35 `-vga` CREATES AN ISA VGA DEVICE ON THE LEGACY BUS and macOS expects the PCIe
-# one - which OpenCore supplies as `vmware-svga` in `extra_args` below.
+# one - which OpenCore supplies as `vmware-svga` in the profile's own arguments below.
 video:
   kind: none
 
 # `usb-audio`, NOT HDA, AND IT IS THE ONLY DEVICE APPLE'S DRIVER BINDS WITHOUT INJECTION.
 #
 # MEASURED: AppleHDA's controller loads against an ICH9 HDA device once OpenCore injects a matching
-# device-id - `com.apple.driver.AppleHDAController (600.2)`, `com.apple.iokit.IOHDAFamily (600.2)`,
-# `com.apple.iokit.IOAudioFamily (600.2)` all appear - but it NEVER ENUMERATES THE CODEC:
-# `IOHDACodecDevice` has no children, `AppleHDAEngine` is never instantiated, and CoreAudio reports
-# zero devices. qemu's `hda-duplex` does not present a vendor/product pair that AppleHDA's
-# personalities match. `AppleUSBAudio` is in every macOS, is already loaded, and binds qemu's
-# `usb-audio` with no injection at all.
+# device-id - `com.apple.driver.AppleHDAController`, `com.apple.iokit.IOHDAFamily` and
+# `com.apple.iokit.IOAudioFamily` all appear - but it NEVER ENUMERATES THE CODEC: `IOHDACodecDevice`
+# has no children, `AppleHDAEngine` is never instantiated, and CoreAudio reports zero devices.
+# `AppleUSBAudio` is in every macOS, is already loaded, and binds qemu's `usb-audio` with no injection.
 audio: usb
 
 # THE KEY IS NOT A SECRET AND IS NOT OPTIONAL. macOS reads it from the SMC to decide whether the
-# firmware is Apple's, and without it the kernel stops before it draws anything. Every hackintosh
-# carries the same string.
+# firmware is Apple's, and without it the kernel stops before it draws anything.
 smc: true
 
-# macOS'S INSTALLER IS THE RECOVERY IMAGE ON A USB DEVICE, so a boot that attaches it is the one that
-# writes. Every later stage boots an installed system and attaches nothing - which is why an installed
-# macOS booted WITH a recovery image would be given a throwaway overlay and rupture on destroy.
-install_medium: recovery
+# APPLE'S OWN AGENT NEVER LOADS UNDER QEMU, and the third-party one that does probes
+# `/dev/cu.serial1` first - which is the FIRST isa-serial device qemu adds, so this must be the only
+# one.
+qga: isa-serial
 
-extra_args:
-  # THE THREE ICH9 GLOBALS AND THE RTC/SMBIOS LINES, from macos/15/machine.py's own list.
-  - ["-global", "ICH9-LPC.disable_s3=1"]
-  - ["-global", "ICH9-LPC.disable_s4=1"]
-  - ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"]
-  - ["-rtc", "base=utc"]
-  - ["-smbios", "type=2"]
-  # BARE `vmware-svga`, NOT `vmware-svga,vgamem_mb=256`, AND THE MEASUREMENT IS THE REASON.
-  #
-  # The Python implementation sets vgamem_mb=256 for an INSTALLED macOS, which has VMwareGfx loaded
-  # and can use the memory. THE RECOVERY SYSTEM HAS NO SUCH DRIVER, and asking for 256 MB made its
-  # framebuffer far WORSE rather than better - two runs on adjacent commits, same walkthrough, same
-  # machine:
-  #
-  #	22eeda3   bare vmware-svga         1803 frames captured,   3 lost
-  #	5ba0c18   vgamem_mb=256              92 frames captured, 264 lost
-  #
-  # 264 LOST TICKS IS THREE QUARTERS OF THE RECORDING, and the 92 that survived are BLACK at mean
-  # luminance 0.6 - the recovery system never drew anything. The `Ul ag` that the gate reported for
-  # thirty minutes is OCR reading noise, not a menu.
-  #
-  # SO THE 640x480 IS NOT A MEMORY PROBLEM AND THIS ARGUMENT DOES NOT FIX IT. The gate reads 640x480
-  # because that is the mode OpenCore's GOP leaves the guest in before macOS loads a display driver;
-  # the fix has to be in where the walkthrough reads, not in the adapter.
-  - ["-device", "vmware-svga"]
+# macOS'S INSTALLER IS THE RECOVERY IMAGE ON A USB DEVICE, so a boot that attaches it is the one that
+# writes. Every later stage boots an installed system and attaches nothing.
+install_medium: recovery
 
 media:
   # macOS HAS NO INSTALL ISO, and the refusal says so rather than letting a stage attach one and watch
@@ -105,27 +67,133 @@ media:
   iso: false
   iso_reason: "macOS has no install ISO; it installs from its recovery image. Use `recovery:` rather than `iso:`"
   recovery: true
-  # THE POINTER AND THE BUS IT LIVES ON, AND BOTH ARE NEEDED ON EVERY macOS BOOT.
-  #
-  # A MAC HAS NO PS/2, so a pointer that is not on USB is a pointer that does not exist - a macOS
-  # guest booted from an installed disk had NO POINTER AT ALL until this was written, and its first
-  # click died in qemu rather than on the screen:
-  #
-  #	click (965, 981): pointer to (965, 981): Input handler not found for event type abs
-  #
-  # THE BUS IS UNCONDITIONAL and only the image is conditional: the tablet lives on that bus, so it
-  # must exist whether or not a recovery image is attached.
-  # THE BUS AND THE POINTER ARE ATTACHED ON EVERY BOOT, not only an install.
-  #
-  # THEY USED TO LIVE INSIDE THE RECOVERY CONDITIONAL, and that was the bug: a macOS guest booted
-  # from an INSTALLED disk had NO POINTER AT ALL, and its first click died in qemu rather than on
-  # the screen. The controller is first because qemu resolves `bus=xhci.0` as it parses.
-  device_args:
-    - ["-device", "qemu-xhci,id=xhci"]
-    - ["-device", "usb-tablet,bus=xhci.0"]
-    - ["-device", "usb-kbd,bus=xhci.0"]
-  # AND THE IMAGE ITSELF, ONLY WHEN ONE IS ATTACHED. No `bootindex`: the firmware reaches it only
-  # after OpenCore hands over.
-  recovery_args:
-    - ["-drive", "file={{recovery}},media=disk,if=none,id=rec,readonly=on"]
-    - ["-device", "usb-storage,bus=xhci.0,drive=rec"]
+
+# TWO PROFILES, BECAUSE AN INSTALL AND AN INSTALLED SYSTEM ARE DIFFERENT MACHINES.
+#
+# THE DIFFERENCE IS NOT A PLACEHOLDER. An install attaches the recovery image as a USB disk and MUST
+# NOT let a trim reach the target: MEASURED, 42009463444 wrote 36774 MiB, dropped to 19761 and froze
+# at "About 48 minutes remaining", because qemu honoured every TRIM for clusters the APFS snapshot
+# still referred to. An installed disk is the opposite - no recovery device, and discard=unmap is
+# exactly what keeps the published qcow2 small (26 GiB of freed blocks that `qemu-img convert -c`
+# cannot remove).
+#
+# A WALK SELECTS ONE BY THE `recovery:` IT GIVES ITS `boot:` STEP, which is the same fact stated once:
+# the profile that attaches a recovery image is the profile that installs.
+qemu:
+  default: disk
+
+  profiles:
+    # ------------------------------------------------------------- install
+    install:
+      # OpenCore's own disk at bootindex=0, the target at 1. "A disk with no bootindex is not in the
+      # boot order at all" - the firmware then reports it could not load Boot0001, six runs in a row.
+      #
+      # NO `discard=unmap` ON THE TARGET, for the measurement above.
+      machine: "q35,accel=kvm,vmport=off"
+
+      args:
+        # THE TWO PFLASH SLOTS. `readonly=on` for the ROM because qemu must not write to it; the
+        # variables store is per-guest NVRAM and qemu DOES write it, which is why the fetch makes a
+        # copy per guest rather than referencing the template.
+        - ["-drive", "if=pflash,format=raw,readonly=on,file={{dir}}/macos.rom"]
+        - ["-drive", "if=pflash,format=raw,file={{dir}}/macos.vars"]
+
+        # OPENCORE'S OWN DISK, FIRST AND WITH `bootindex=0`.
+        - ["-drive", "file={{dir}}/boot.img,format=raw,if=none,id=oc"]
+        - ["-device", "virtio-blk-pci,drive=oc,bootindex=0"]
+
+        # THE AGENT'S PORT. Apple's third-party agent probes `/dev/cu.serial1`, so this must be the
+        # only isa-serial device the machine creates.
+        - ["-chardev", "socket,id=qga0,path={{work}}/qga.sock,server=on,wait=off"]
+        - ["-device", "isa-serial,chardev=qga0"]
+
+        # THE CONTROLLER AND THE POINTER, ON EVERY BOOT. A MAC HAS NO PS/2, so a pointer that is not
+        # on USB is a pointer that does not exist - a macOS guest booted from an installed disk had
+        # NO POINTER AT ALL until this was written, and its first click died in qemu:
+        #
+        #	click (965, 981): pointer to (965, 981): Input handler not found for event type abs
+        #
+        # THE CONTROLLER COMES FIRST because qemu resolves `bus=xhci.0` as it parses.
+        - ["-device", "qemu-xhci,id=xhci"]
+        - ["-device", "usb-tablet,bus=xhci.0"]
+        - ["-device", "usb-kbd,bus=xhci.0"]
+
+        # THE RECOVERY IMAGE, AS REMOVABLE MEDIA. No `bootindex`: the firmware reaches it only after
+        # OpenCore hands over.
+        - ["-drive", "file={{recovery}},media=disk,if=none,id=rec,readonly=on"]
+        - ["-device", "usb-storage,bus=xhci.0,drive=rec"]
+
+        # THE TARGET.
+        - ["-drive", "file={{disk}},if=none,format=qcow2,id=target"]
+        - ["-device", "virtio-blk-pci,drive=target,bootindex=1"]
+
+        # THE THREE ICH9 GLOBALS AND THE RTC/SMBIOS LINES, from macos/15/machine.py's own list.
+        - ["-global", "ICH9-LPC.disable_s3=1"]
+        - ["-global", "ICH9-LPC.disable_s4=1"]
+        - ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"]
+        - ["-rtc", "base=utc"]
+        - ["-smbios", "type=2"]
+
+        # BARE `vmware-svga`, NOT `vmware-svga,vgamem_mb=256`, AND THE MEASUREMENT IS THE REASON.
+        #
+        # The Python implementation sets vgamem_mb=256 for an INSTALLED macOS, which has VMwareGfx
+        # loaded and can use the memory. THE RECOVERY SYSTEM HAS NO SUCH DRIVER, and asking for 256 MB
+        # made its framebuffer far WORSE - two runs on adjacent commits, same walkthrough:
+        #
+        #	22eeda3   bare vmware-svga         1803 frames captured,   3 lost
+        #	5ba0c18   vgamem_mb=256              92 frames captured, 264 lost
+        #
+        # 264 LOST TICKS IS THREE QUARTERS OF THE RECORDING, and the 92 that survived are BLACK.
+        - ["-device", "vmware-svga"]
+
+        # THE SOUND CARD. AppleHDA never enumerates a codec under qemu, so this is USB.
+        - ["-audiodev", "none,id=snd0"]
+        - ["-device", "usb-audio,bus=xhci.0,audiodev=snd0"]
+
+        # THE SMC KEY. macOS reads it to decide whether the firmware is Apple's.
+        - ["-device", "isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"]
+
+        - ["-netdev", "tap,id=net0,ifname=qemutap0,script=no,downscript=no"]
+        - ["-device", "virtio-net-pci,netdev=net0,mac=52:54:00:56:4d:01,romfile=,host_mtu=1450"]
+
+    # ---------------------------------------------------------------- disk
+    disk:
+      # AN INSTALLED macOS. No recovery device, and `discard=unmap` ON - which is what keeps a
+      # published disk small: measured on an installed macOS 26 disk, `df -h /` said 12 GiB used and
+      # 108 GiB available while the host saw 38.4 GiB allocated, and 26 GiB of those were blocks the
+      # guest had already freed and `qemu-img convert -c` cannot remove.
+      machine: "q35,accel=kvm,vmport=off"
+
+      args:
+        - ["-drive", "if=pflash,format=raw,readonly=on,file={{dir}}/macos.rom"]
+        - ["-drive", "if=pflash,format=raw,file={{dir}}/macos.vars"]
+
+        - ["-drive", "file={{dir}}/boot.img,format=raw,if=none,id=oc"]
+        - ["-device", "virtio-blk-pci,drive=oc,bootindex=0"]
+
+        - ["-chardev", "socket,id=qga0,path={{work}}/qga.sock,server=on,wait=off"]
+        - ["-device", "isa-serial,chardev=qga0"]
+
+        - ["-device", "qemu-xhci,id=xhci"]
+        - ["-device", "usb-tablet,bus=xhci.0"]
+        - ["-device", "usb-kbd,bus=xhci.0"]
+
+        # THE TARGET, AND `discard=unmap` BECAUSE NOTHING IS INSTALLING.
+        - ["-drive", "file={{disk}},if=none,format=qcow2,discard=unmap,id=target"]
+        - ["-device", "virtio-blk-pci,drive=target,bootindex=1"]
+
+        - ["-global", "ICH9-LPC.disable_s3=1"]
+        - ["-global", "ICH9-LPC.disable_s4=1"]
+        - ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"]
+        - ["-rtc", "base=utc"]
+        - ["-smbios", "type=2"]
+
+        - ["-device", "vmware-svga"]
+
+        - ["-audiodev", "none,id=snd0"]
+        - ["-device", "usb-audio,bus=xhci.0,audiodev=snd0"]
+
+        - ["-device", "isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"]
+
+        - ["-netdev", "tap,id=net0,ifname=qemutap0,script=no,downscript=no"]
+        - ["-device", "virtio-net-pci,netdev=net0,mac=52:54:00:56:4d:01,romfile=,host_mtu=1450"]

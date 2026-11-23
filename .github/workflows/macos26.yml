@@ -131,7 +131,7 @@ jobs:
             "name": "macos26-setup",
             "file": "26/steps/setup.walk",
             "pull": "",
-            "assets": ["macos-recovery-tahoe:recovery.dmg"],
+            "assets": ["macos-recovery-tahoe:recovery.dmg.tar"],
             "out": "macos26.qcow2",
             "publish": "macos26",
             "timeout": 400
@@ -214,7 +214,7 @@ jobs:
             "name": "macos26-vm-configure",
             "file": "26/steps/vm-configure.walk",
             "pull": "macos26-ssh",
-            "assets": ["macos-asset-mac-guest-agent:mac-guest-agent"],
+            "assets": ["macos-asset-mac-guest-agent:mac-guest-agent.tar"],
             "out": "macos26-vm-configure.qcow2",
             "publish": "macos26-vm-configure",
             "timeout": 90
@@ -260,7 +260,7 @@ jobs:
             "name": "macos26-dev",
             "file": "26/steps/dev.walk",
             "pull": "macos26-vm-configure",
-            "assets": ["macos-asset-xcode-26.6:Xcode_26.6_Universal.xip", "dev-node-pkg:node.pkg", "dev-python-pkg:python.pkg"],
+            "assets": ["macos-asset-xcode-26.6:Xcode_26.6_Universal.xip.tar", "dev-node-pkg:node.pkg.tar", "dev-python-pkg:python.pkg.tar"],
             "out": "macos26-dev.qcow2",
             "publish": "macos26-dev",
             "timeout": 90

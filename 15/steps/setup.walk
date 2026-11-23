@@ -12,13 +12,8 @@ var shutdown
   default kill
   from args.shutdown
 step "the recovery image this stage reads is already on disk"
-  needs [recovery.dmg, macos-firmware.tar]
+  needs [recovery.dmg, boot.img, macos.rom, macos.vars]
 
-
-step "the firmware this guest boots through"
-  fetch opencore
-  recovery recovery.dmg
-  release "15"
 
 
 step "create the empty disk"
