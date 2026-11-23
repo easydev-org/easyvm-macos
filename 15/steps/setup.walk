@@ -102,7 +102,7 @@ step "step down to the uninitialised disk"
         repeat
           do
             item
-              key down
+              input down
             item
               settle 1
             item
@@ -125,7 +125,7 @@ step "erase - open the sheet"
   repeat
     do
       item
-        click [1681, 57]
+        input 1681 57
       item
         settle 3
       item
