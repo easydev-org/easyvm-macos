@@ -1,0 +1,51 @@
+name: macos-26-setup
+
+# THE RECOVERY IMAGE TO A SETUP ASSISTANT - THE macOS 26 TWIN OF `macos-setup.yml`.
+#
+# WHY THIS EXISTS AS ITS OWN FILE. macOS 26 was only reachable through `macos26.yml`, the old
+# multi-job workflow that chains room -> setup -> ssh -> vm-configure -> dev with `needs:`. Every
+# other stage in this repository is its own workflow so that one can be dispatched while another
+# runs, and this repository's own `ci:` commit did that for 15 and left 26 behind.
+#
+# THE TWO ASSETS ARE BOTH NAMED `-26`, AND THAT IS THE WHOLE DIFFERENCE FROM 15. The recovery image
+# is `macos-recovery-tahoe` and the firmware is `macos-firmware-26`: a boot.img from one release with
+# a macos.rom from another is a guest that cannot boot, and nothing would report it until OVMF did.
+
+on:
+  workflow_dispatch:
+    inputs:
+      disks_repository:
+        description: "the ghcr repository that holds the disks"
+        default: "easydev-org/easyvm-macos"
+
+concurrency:
+  group: macos-26-setup
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  checks: write
+
+jobs:
+  setup:
+    uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.3-dev
+    secrets: inherit
+    with:
+      image_repository: easydev-org/easyvm
+      image_tag: v0.0.3-dev
+      disk_gb: "40"
+      group: macos-26-setup
+      disks_repository: ${{ inputs.disks_repository }}
+      stages: |
+        [
+          {
+            "name": "macos-26-setup",
+            "file": "26/steps/setup.walk",
+            "pull": "",
+            "assets": ["macos-recovery-tahoe:recovery.dmg.tar", "macos-firmware-26:macos-firmware.tar"],
+            "out": "macos26.qcow2",
+            "publish": "macos26",
+            "timeout": 180
+          }
+        ]
