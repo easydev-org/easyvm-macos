@@ -31,9 +31,6 @@ on:
       disks_repository:
         description: "the ghcr repository that holds the assets"
         default: "easydev-org/easyvm-macos"
-      from_tag:
-        description: "start from this published disk instead of building it (macos26, macos26-ssh)"
-        default: ""
 
 concurrency:
   group: macos26
@@ -133,26 +130,8 @@ jobs:
             "timeout": 400
           }
         ]
-
-  # THE `ssh` STAGE, WHICH STARTS BY ANSWERING THE WIZARD.
-  #
-  # `setup` ENDS WHERE THE INSTALLER ENDS: the Setup Assistant is up and there is no user yet. This
-  # stage answers every pane, logs in as the account it creates, turns Remote Login on, proves the
-  # session over ssh, and powers the guest off through its own init - so APFS closes its journal
-  # before the disk is published.
-  #
-  # IT IS A SEPARATE JOB FOR THE SAME REASON macos.yml HAS ONE: the wizard plus the login plus the
-  # ssh proof is its own hour, and a failure here must cost that hour rather than the whole install.
-  #
-  # ITS OWN `timeout` IS 200 MINUTES. Measured: the wizard took ~25 minutes on the workbench and the
-  # CI runner is slower (the install there is ~40 minutes against ~25), and the update pane's
-  # reset-then-wait-then-log-in sequence alone spends two and a half minutes.
   ssh:
     needs: [room, setup]
-    # A SKIPPED `setup` IS SATISFIED BY `needs`, which is what makes `from_tag: macos26` start HERE:
-    # the disk is already published, and re-installing it to reach a one-hour wizard is three wasted
-    # hours. A FAILED setup is still refused, because then `macos26` points at an older disk and an
-    # ssh stage that ran anyway would prove something about a disk nobody asked about.
     if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos26' || inputs.from_tag == 'macos26-ssh')
     uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.2
     secrets: inherit
