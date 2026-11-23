@@ -53,6 +53,7 @@ jobs:
             "name": "macos15-smoke",
             "file": "15/steps/smoke.walk",
             "pull": "${{ inputs.from_tag }}",
+            "assets": ["macos-firmware-15:macos-firmware.tar"],
             "out": "",
             "timeout": 20
           }

@@ -53,6 +53,7 @@ jobs:
             "name": "macos26-smoke",
             "file": "26/steps/smoke.walk",
             "pull": "${{ inputs.from_tag }}",
+            "assets": ["macos-firmware-26:macos-firmware.tar"],
             "out": "",
             "timeout": 20
           }
