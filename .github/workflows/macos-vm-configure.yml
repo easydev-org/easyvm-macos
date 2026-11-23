@@ -23,7 +23,7 @@ on:
     inputs:
       disks_repository:
         description: "the ghcr repository that holds the disks"
-        default: "easydev-org/easyvm-macos"
+        default: "macos15-ssh"
       from_tag:
         description: >-
           the PUBLISHED disk this stage continues from (default macos15-ssh)

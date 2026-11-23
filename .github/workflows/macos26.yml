@@ -31,6 +31,11 @@ on:
       disks_repository:
         description: "the ghcr repository that holds the assets"
         default: "easydev-org/easyvm-macos"
+      from_tag:
+        description: >-
+          the PUBLISHED disk this chain starts from. Empty runs every stage; a stage's own tag
+          starts there, because the disks before it are already published.
+        default: ""
 
 concurrency:
   group: macos26
