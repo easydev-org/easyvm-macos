@@ -1,6 +1,6 @@
-name: macos-26-setup
+name: macos-26-install
 
-# THE RECOVERY IMAGE TO A SETUP ASSISTANT - THE macOS 26 TWIN OF `macos-setup.yml`.
+# THE RECOVERY IMAGE TO A SETUP ASSISTANT - THE macOS 26 TWIN OF `macos-15-install.yml`.
 #
 # WHY THIS EXISTS AS ITS OWN FILE. macOS 26 was only reachable through `macos26.yml`, the old
 # multi-job workflow that chains room -> setup -> ssh -> vm-configure -> dev with `needs:`. Every
@@ -19,7 +19,7 @@ on:
         default: "easydev-org/easyvm-macos"
 
 concurrency:
-  group: macos-26-setup
+  group: macos-26-install
   cancel-in-progress: true
 
 permissions:
@@ -28,19 +28,19 @@ permissions:
   checks: write
 
 jobs:
-  setup:
+  install:
     uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.4
     secrets: inherit
     with:
       image_repository: easydev-org/easyvm
       image_tag: v0.0.4
       disk_gb: "40"
-      group: macos-26-setup
+      group: macos-26-install
       disks_repository: ${{ inputs.disks_repository }}
       stages: |
         [
           {
-            "name": "macos-26-setup",
+            "name": "macos-26-install",
             "file": "26/steps/setup.walk",
             "pull": "",
             "assets": ["macos-recovery-tahoe:recovery.dmg.tar", "macos-firmware-26:macos-firmware.tar"],
