@@ -47,6 +47,11 @@ jobs:
       disk_gb: "40"
       group: macos-26-smoke
       disks_repository: ${{ inputs.disks_repository }}
+      # FORTY MINUTES, NOT THE TWENTY macOS 15 USES. MEASURED: that leg succeeded in 18.5 minutes of
+      # wall clock (run 45176110724, 12:37:44 -> 12:56:09) with its own disk, while THIS one pulls
+      # 33 GB - and run 45322728321 was cancelled at 20:23, twenty minutes in, having just finished
+      # the pull. The budget has to cover "pull the disk, boot it, record three minutes", and only the
+      # last of those is the walk.
       stages: |
         [
           {
@@ -55,6 +60,6 @@ jobs:
             "pull": "${{ inputs.from_tag }}",
             "assets": ["macos-firmware-26:macos-firmware.tar"],
             "out": "",
-            "timeout": 20
+            "timeout": 40
           }
         ]
