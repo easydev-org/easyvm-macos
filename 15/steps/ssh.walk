@@ -575,23 +575,35 @@ step "note what is absent"
 #
 #	qemu-img convert: error while writing at byte 43931992064: No space left on device
 #
-# The work directory at that moment held `disk.qcow2` 28620 MiB (the pulled, read-only system),
-# `run-overlay.qcow2` 25243 MiB (what this guest wrote) and was trying to write a ~30 GiB compressed
-# flatten of the two. That is ~84 GiB of peak on an 84 GiB runner.
+# Its own directory listing at that moment, and the arithmetic the whole fix follows from:
 #
-# THE OVERLAY IS THE PART THIS WALK CAN SHRINK; the other two are the artifact and its own output.
-# A macOS guest's first boot is what fills it - the system volume's first-boot snapshot and a sleep
-# image near the size of the guest's RAM, which is 12 GiB here.
+#	disk.qcow2          28620 MiB   27.9 GiB   the pulled system, the read-only backing
+#	run-overlay.qcow2   25243 MiB   24.7 GiB   what the guest wrote
+#	publish target                 40.9 GiB   where the flatten stopped writing
+#	                               --------
+#	                              ~93.5 GiB    on an 84 GiB runner
+#
+# SO THE OVERLAY HAS TO COME DOWN TO ~15 GiB for the three to fit at once. THE SLEEP IMAGE ALONE IS
+# ABOUT HALF OF IT: it is written at hibernatemode 3 with a size near the guest's RAM, which is
+# 12288 MiB on this machine. The rest is the boot snapshot and the caches a first macOS boot writes.
 #
 # `discard=unmap` IS ALREADY ON THE DISK'S `-drive` LINE, so a DELETE INSIDE THE GUEST HANDS THE
 # CLUSTERS BACK and the overlay on the host shrinks - it is not merely free space the guest can
-# reuse.
+# reuse afterwards.
 #
-# THE SLEEP IMAGE IS SAFE TO REMOVE: this image does not offer hibernation, `vm-configure` turns
-# sleeping off entirely, and macOS recreates the file if it ever wants one. Time Machine's local
-# snapshots are purgeable by definition and no stage reads one.
+# WHAT IS REMOVED AND WHY IT IS SAFE:
+#
+#	sleepimage        this image offers no hibernation, `vm-configure` turns sleeping off entirely,
+#	                  and macOS recreates the file if it ever wants one
+#	local snapshots   Time Machine's local snapshots are purgeable by definition; no stage reads one
+#	                  and `tmutil` skips them by time, so anything it will not delete it reports
+#	swapfiles         matched to the guest's RAM and recreated on demand; removing them is what
+#	                  `dynamic_pager` is for, and `swapoff -a` is not needed for a file to be re-edged
+#
+# `df -h /` IS PRINTED BY THE STEP ITSELF so the next run's log says whether it worked, instead of
+# leaving the next person to infer it from a qemu-img error forty minutes later.
 step "give the overlay back the space the guest spent"
-  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'rm -f /private/var/vm/sleepimage; for s in $(tmutil listlocalsnapshots / 2>/dev/null | sed -n \"s/^com\\.apple\\.TimeMachine.*\\.\\(.*\\)$/\\1/p\"); do tmutil deletelocalsnapshots \"$s\" 2>/dev/null; done; sync; df -h / | tail -1'"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'rm -f /private/var/vm/sleepimage; rm -f /private/var/vm/swapfile*; for s in $(tmutil listlocalsnapshots / 2>/dev/null | sed -n \"s/^com\\.apple\\.TimeMachine.*\\.\\(.*\\)$/\\1/p\"); do tmutil deletelocalsnapshots \"$s\" 2>/dev/null; done; sync; df -h / | tail -1'"
   timeout 300
 
 

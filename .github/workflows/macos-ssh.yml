@@ -45,37 +45,38 @@ jobs:
     with:
       image_repository: easydev-org/easyvm
       image_tag: v0.0.4
-      # 100 GB, BECAUSE THIS LEG HOLDS THREE COPIES OF A 28.6 GiB SYSTEM AT ONCE.
+      # 80 GB, WHICH IS THE RUNNER'S OWN CEILING, NOT A WISH.
       #
-      # `disk_gb` is the FREE SPACE this job checks for before it starts, and it has now been wrong
-      # twice in the same direction:
+      # This number has been wrong three times, each time in a way the previous failure explained:
       #
       #	25   smaller than the one artifact it pulls. MEASURED on 45597026226:
       #	     `attempt 1/8: 0 of 30010703872` then `recording NOT written: ffmpeg: End of file`
       #
       #	70   covered the pull but not the PEAK. MEASURED on 45600395447, which ran all 34 steps
-      #	     and then died in `publish the disk`:
+      #	     and died in `publish the disk`:
       #
       #	     qemu-img convert: error while writing at byte 43931992064: No space left on device
       #
-      # WHAT THE PEAK IS, from that run's own `ls -l` of the work directory:
+      #	100  refused before a job existed. MEASURED on 45611118592:
       #
-      #	disk.qcow2          28620 MiB   the pulled system, read-only backing
+      #	     runner-check: ... has 84 GiB free; 100 GiB needed
+      #
+      # SO THE RUNNER IS 84 GiB AND THAT IS THE WHOLE BUDGET. `runner-check`'s prune cannot buy more
+      # here - stage.yml says why in its own words: pruning deletes the HOST's SDKs, and a
+      # `container:` job cannot see the host. This leg therefore has to FIT, not ask for more.
+      #
+      # THE PEAK IS THREE COPIES at the moment `publish` runs, from that run's own directory listing:
+      #
+      #	disk.qcow2          28620 MiB   the pulled system, the read-only backing
       #	run-overlay.qcow2   25243 MiB   what the guest wrote: macOS at first boot
-      #	publish target      ~30000 MiB  the compressed flatten of the two
-      #	                   ----------
-      #	                   ~84 GiB     and the runner had 84
+      #	publish target      the compressed flatten - and it had reached 40.9 GiB when it died
       #
-      # THE OVERLAY IS NOT OPTIONAL AND IT IS NOT SMALL. Every boot after the install reads through a
-      # read-only base (see overlay.Create) - that is what makes `discard=unmap` safe and what lets a
-      # failed run leave the published disk untouched - and a macOS first boot writes cache, the sleep
-      # image and a journal, tens of GiB of it, into that diff.
-      #
-      # 100 IS THE SUM ROUNDED UP. It also crosses `runner-check`'s prune threshold, which only fires
-      # when the requirement EXCEEDS what the runner currently has: at 70 against 84 GiB free the
-      # check passed and pruned nothing, so the .NET SDK, the Android SDK, GHC and CodeQL - 20 to 30
-      # GiB of them - sat there through the whole leg and could have been the difference.
-      disk_gb: "100"
+      # THE OVERLAY IS THE ONE THIS WALK CONTROLS, so `15/steps/ssh.walk` now deletes the sleep image
+      # and the first-boot local snapshots INSIDE the guest before it stops. With `discard=unmap`
+      # already on the disk's `-drive` line, those deletes hand the clusters back and the overlay on
+      # the host shrinks - which is also why it is 80 and not 84: the check should keep failing
+      # EARLY rather than forty minutes into a leg that cannot publish.
+      disk_gb: "80"
       group: macos-ssh
       disks_repository: ${{ inputs.disks_repository }}
       # THE FIRMWARE IS AN ASSET THIS WALK BOOTS FROM, AND `assets:` WAS EMPTY.
