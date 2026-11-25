@@ -127,7 +127,7 @@ jobs:
 
   setup:
     needs: room
-    if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '' || inputs.from_tag == 'macos26')
+    if: always() && !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.from_tag == '')
     uses: easydev-org/easyvm/.github/workflows/stage.yml@v0.0.4
     secrets: inherit
     with:
