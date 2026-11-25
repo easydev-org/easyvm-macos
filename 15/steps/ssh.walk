@@ -568,6 +568,37 @@ step "name the machine"
 step "note what is absent"
   ssh "command -v brew || true"
 
+
+# THE DISK THIS STAGE HANDS ON MUST FIT IN THE RUNNER THAT IS WRITING IT, AND IT DID NOT.
+#
+# MEASURED on run 45600395447, which passed all 34 steps and then died in `publish the disk`:
+#
+#	qemu-img convert: error while writing at byte 43931992064: No space left on device
+#
+# The work directory at that moment held `disk.qcow2` 28620 MiB (the pulled, read-only system),
+# `run-overlay.qcow2` 25243 MiB (what this guest wrote) and was trying to write a ~30 GiB compressed
+# flatten of the two. That is ~84 GiB of peak on an 84 GiB runner.
+#
+# THE OVERLAY IS THE PART THIS WALK CAN SHRINK; the other two are the artifact and its own output.
+# A macOS guest's first boot is what fills it - the system volume's first-boot snapshot and a sleep
+# image near the size of the guest's RAM, which is 12 GiB here.
+#
+# `discard=unmap` IS ALREADY ON THE DISK'S `-drive` LINE, so a DELETE INSIDE THE GUEST HANDS THE
+# CLUSTERS BACK and the overlay on the host shrinks - it is not merely free space the guest can
+# reuse.
+#
+# THE SLEEP IMAGE IS SAFE TO REMOVE: this image does not offer hibernation, `vm-configure` turns
+# sleeping off entirely, and macOS recreates the file if it ever wants one. Time Machine's local
+# snapshots are purgeable by definition and no stage reads one.
+step "give the overlay back the space the guest spent"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'rm -f /private/var/vm/sleepimage; for s in $(tmutil listlocalsnapshots / 2>/dev/null | sed -n \"s/^com\\.apple\\.TimeMachine.*\\.\\(.*\\)$/\\1/p\"); do tmutil deletelocalsnapshots \"$s\" 2>/dev/null; done; sync; df -h / | tail -1'"
+  timeout 300
+
+
+step "say how much room the guest has left"
+  ssh "df -h / | tail -1"
+  timeout 60
+
   # `shutdown: ssh` RATHER THAN A HAND-WRITTEN `poweroff`, BECAUSE THE HAND-WRITTEN ONE CANNOT WIN.
   #
   # MEASURED ON RUN 44450353655, step 29 of 31 - the step before the last:
