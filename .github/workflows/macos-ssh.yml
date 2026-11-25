@@ -60,29 +60,35 @@ jobs:
       disk_gb: "70"
       group: macos-ssh
       disks_repository: ${{ inputs.disks_repository }}
+      # THE FIRMWARE IS AN ASSET THIS WALK BOOTS FROM, AND `assets:` WAS EMPTY.
+      #
+      # MEASURED on run 45598310905, whose first step refused to start:
+      #
+      #	error: the media this stage boots from is already on disk: boot.img is not in
+      #	       .../work; macos.rom is not in .../work; macos.vars is not in .../work
+      #
+      # `15/steps/ssh.walk` declares `needs [boot.img, macos.rom, macos.vars]`, and its boot line
+      # loads them as `if=pflash ... file=macos.rom`, `file=macos.vars` and `file=boot.img,format=raw`.
+      # All three come from `macos-firmware-15`, the tag `artifacts-publish.yml`'s `opencore` job
+      # writes for release 15 - it builds boot.img and macos.rom from the mirrored recovery image and
+      # renders macos.vars from its template.
+      #
+      # `pull:` AND `assets:` ARE DIFFERENT THINGS AND THIS STAGE NEEDED BOTH. `pull: macos15` is the
+      # published SYSTEM, 28.6 GiB of installed macOS. `assets:` is everything else the machine needs
+      # to BE a machine. With an empty list the disk arrived and the firmware did not, so the guest
+      # had nothing to boot from. The install leg declares this same tar for the same reason; ssh
+      # needs only it, because the recovery image is what an INSTALLER reads and not what a finished
+      # disk does.
+      #
+      # NOTE FOR THE NEXT EDIT: `stages:` IS A JSON ARRAY IN A YAML BLOCK SCALAR. JSON has no
+      # comments, so an explanation put between its braces makes the whole stage unparseable and the
+      # workflow is rejected before any job exists - which is what happened to run 45600145134.
       stages: |
         [
           {
             "name": "macos-ssh",
             "file": "15/steps/ssh.walk",
             "pull": "${{ inputs.from_tag }}",
-            # THE FIRMWARE IS AN ASSET THIS WALK BOOTS FROM, AND IT WAS EMPTY.
-            #
-            # MEASURED on run 45598310905, whose first step refused to start:
-            #
-            #	error: the media this stage boots from is already on disk: boot.img is not in
-            #	       .../work; macos.rom is not in .../work; macos.vars is not in .../work
-            #
-            # `15/steps/ssh.walk` declares `needs [boot.img, macos.rom, macos.vars]` and its boot line
-            # loads them as `if=pflash ... file=macos.rom`, `file=macos.vars` and
-            # `file=boot.img,format=raw`. All three come from `macos-firmware-15`, which is the tag
-            # `artifacts-publish.yml`'s `opencore` job writes for release 15 - it builds boot.img and
-            # macos.rom from the recovery image and renders macos.vars from its template.
-            #
-            # THE DISK IS PULLED, NOT THE FIRMWARE, WHICH IS WHY `pull:` ALONE WAS NOT ENOUGH: `pull:`
-            # names the published SYSTEM (macos15, 28.6 GiB), and `assets:` names everything else the
-            # machine needs to be a machine. The install leg declares this same tar for the same
-            # reason.
             "assets": ["macos-firmware-15:macos-firmware.tar"],
             "out": "macos15-ssh.qcow2",
             "publish": "macos15-ssh",
