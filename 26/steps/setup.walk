@@ -364,11 +364,23 @@ step "the copy runs, look 1 of at most 8"
     # job - which is exactly what happened: the run was cancelled at 101 minutes with the bar still at
     # 18 pixels and the first nudge still two hours away.
     #
-    # NINETY IS THE UPSTREAM'S NUMBER and it is twice the observed 42-minute first draw, which leaves
-    # a wide margin for a slow runner. The looks after this one keep their ten minutes, because by then
-    # the installer has already been through its graphics swap.
-    max 400
-    nudge 5400
+    # EIGHTY MINUTES, AND THE NUMBER BEFORE IT WAS THREE HOURS.
+    #
+    # `max 400` FINISHED AFTER THE JOB DID. MEASURED on run 45573909539: 357 attempts in 9934 seconds
+    # of recording is 27.8 seconds an attempt - the two settles plus the OCR - so 400 attempts is 186
+    # MINUTES inside a job whose own `timeout:` is 180. The loop could not reach its own end; the job
+    # was killed first, and the leg reported `THE WALKTHROUGH DID NOT FINISH IN TIME` instead of a
+    # step's verdict, with no disk published.
+    #
+    # 180 x 27.8s IS 83 MINUTES, which leaves the rest of the walk room inside the job.
+    #
+    # AND THE NUDGE HAS TO MOVE WITH IT. `nudge 5400` is 90 minutes - PAST the new end - so it would
+    # never fire and the reset, the one action measured to move this installer, would never happen. In
+    # that same run it did fire, at `repeat: 5400s have passed`, precisely because the loop was longer
+    # than the nudge; shortening the loop without shortening the nudge turns the fix into the defect.
+    # At 1800 it fires at the halfway mark and leaves forty minutes to see whether the reset worked.
+    max 180
+    nudge 1800
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
         settle 15
@@ -424,7 +436,16 @@ step "the copy runs, look 2 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 30
+    # SEVEN LOOKS AT 11.5 MINUTES EACH IS 80 MINUTES, WHICH LEFT THE WALK NO ROOM AT ALL.
+    #
+    # MEASURED on run 45573909539: everything before `look 1` took four minutes, and look 1 itself
+    # took 166 of the job's 180. The looks after it are SHORTER loops - 23 seconds a turn against look
+    # 1's 27.8 - but there are seven of them, and 7 x 30 x 23s is another 80 minutes.
+    #
+    # 20 x 23s IS 7.7 MINUTES EACH, 54 for the set, so a run that gets past look 1 still has time to
+    # finish the walk. `nudge 600` stays: ten minutes is when this installer needs the reset, and it
+    # was already inside the loop.
+    max 20
     nudge 600
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
@@ -481,7 +502,7 @@ step "the copy runs, look 3 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 30
+    max 20
     nudge 600
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
@@ -538,7 +559,7 @@ step "the copy runs, look 4 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 30
+    max 20
     nudge 600
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
@@ -595,7 +616,7 @@ step "the copy runs, look 5 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 30
+    max 20
     nudge 600
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
@@ -652,7 +673,7 @@ step "the copy runs, look 6 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 30
+    max 20
     nudge 600
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
@@ -709,7 +730,7 @@ step "the copy runs, look 7 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 30
+    max 20
     nudge 600
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
@@ -766,7 +787,7 @@ step "the copy runs, look 8 of at most 8"
       rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
       scale 1
-    max 30
+    max 20
     nudge 600
       item "pick macOS Installer in OpenCore's picker, if that is what is up"
         input 731 547
