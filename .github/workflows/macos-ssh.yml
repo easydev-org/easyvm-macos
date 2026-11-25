@@ -45,7 +45,19 @@ jobs:
     with:
       image_repository: easydev-org/easyvm
       image_tag: v0.0.4
-      disk_gb: "25"
+      # 70 GB, BECAUSE THE DISK THIS LEG PULLS IS 28.6 GiB BY ITSELF.
+      #
+      # `disk_gb` is the FREE SPACE this job checks for before it starts, and it was 25 - smaller
+      # than the one artifact it has to hold. MEASURED on run 45597026226: the pull began
+      #
+      #	manifest ghcr.io/easydev-org/easyvm-macos:macos15
+      #	attempt 1/8: 0 of 30010703872        <- 28.6 GiB
+      #
+      # and the leg died at step 1 with `recording NOT written: ffmpeg: Error opening input: End of
+      # file`, which is what running out of room looks like from the walk's side. The budget has to
+      # cover the pulled disk, its compressed copy and the recording, so it is 70 rather than the
+      # size of the disk alone.
+      disk_gb: "70"
       group: macos-ssh
       disks_repository: ${{ inputs.disks_repository }}
       stages: |
