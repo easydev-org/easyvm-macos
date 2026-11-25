@@ -861,24 +861,36 @@ step "turn remote login on in the sheet"
 #
 # `scale 1` rather than 2: the sentence is 13-point and the 2x upscale was needed only when the band
 # was tight enough to clip it. A wide band already has the pixels.
+# `bind` INSIDE A `repeat` MAKES A NAME THE LOOP CHECKS, NOT ONE A LATER STEP CAN READ, AND THAT IS
+# WHY THIS STAGE DIED AT STEP 20 RATHER THAN IN FRONT OF A DIALOG:
+#
+#	error: answer the authorisation dialog: `if: asked` names a boolean no `check:` step has made.
+#	       A `check:` step has to come first, in file order.
+#
+# So the question is a `check:` OF ITS OWN - which also makes the name persist for the `if:` below -
+# and the "this dialog may not appear" part is `ol: true` on the reading rather than `optional:`,
+# because a missing dialog is a normal outcome and not a failed step.
+#
+# THE PAUSE IS KEPT: the sheet is drawn after the click that asks for it, and reading immediately
+# answers "no dialog" on a machine that is about to draw one.
+step "let the authorisation dialog arrive"
+  settle 6
+
+
+step "read the screen for the dialog"
+  read
+    name screen
+
+
 step "the authorisation dialog is up, if this pane asks for one"
-  repeat
-    do
-      item
-        settle 2
-      item "read the screen"
-        read
-          name screen
-    until
-      bind asked
-      source screen
-      mode text
-      rect [700, 260, 1500, 900]
-      rect_at [1920, 1080]
-      scale 1
-      words [[trying, to, modify]]
-    max 6
-  optional
+  check
+    source screen
+    mode text
+    name asked
+    rect [700, 260, 1500, 900]
+    rect_at [1920, 1080]
+    scale 1
+    words [[trying, to, modify]]
 
 # THE COORDINATES ARE MEASURED FROM THE DIALOG ITSELF, NOT FROM ITS SHAPE.
 #
