@@ -165,7 +165,7 @@ jobs:
             "name": "macos26-ssh",
             "file": "26/steps/ssh.walk",
             "pull": "macos26",
-            "assets": [],
+            "assets": ["macos-firmware-26:macos-firmware.tar"],
             "out": "macos26-ssh.qcow2",
             "publish": "macos26-ssh",
             "timeout": 200
@@ -199,7 +199,7 @@ jobs:
             "name": "macos26-vm-configure",
             "file": "26/steps/vm-configure.walk",
             "pull": "macos26-ssh",
-            "assets": ["macos-asset-mac-guest-agent:mac-guest-agent.tar"],
+            "assets": ["macos-firmware-26:macos-firmware.tar", "macos-asset-mac-guest-agent:mac-guest-agent.tar"],
             "out": "macos26-vm-configure.qcow2",
             "publish": "macos26-vm-configure",
             "timeout": 90
