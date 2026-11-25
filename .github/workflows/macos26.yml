@@ -81,13 +81,26 @@ jobs:
           # dash, where they are syntax errors - and its check is a plain text match, so an awk
           # character class for whitespace trips it. MEASURED: internal/oci's
           # TestNoWorkflowUsesABashOnlyConstruct failed on the awk version of this line.
-          # THE `.walk` SPELLS IT `memory_mb == 12288`, so the field separator is `==` and not `:`.
-          # THE VALUE IS THE LAST WORD ON THE LINE, which is true of both spellings - so `awk
-          # '{print $NF}'` reads either one and the check does not have to be edited again when a
-          # file moves between formats.
-          need_mib=$(grep -m1 'memory_mb' 26/steps/setup.walk | awk '{print $NF}' | tr -cd '0-9')
+          # THE WALK NO LONGER HAS A `memory_mb` LINE AT ALL, AND THIS CHECK FAILED ON THAT FOR A DAY.
+          #
+          # MEASURED on run 45649369907: the `room` job answered
+          #
+          #	::error::26/steps/setup.walk declares no memory_mb
+          #
+          # and failed, which BLOCKED `setup` and `ssh` through `needs:` - a dispatch whose only
+          # purpose was to run the ssh stage could not schedule anything. The file had moved to the
+          # 2.0 format, where memory is a qemu argument like any other:
+          #
+          #	args [["-m", "12288"], ["-cpu", ...]]
+          #
+          # SO THE NUMBER IS READ FROM THE `-m` PAIR, which is where the engine reads it from too. The
+          # old `memory_mb` spelling is still accepted as a fallback so an older file keeps working.
+          need_mib=$(grep -m1 -o '\["-m", "[0-9]*"\]' 26/steps/setup.walk | tr -cd '0-9')
           if [ -z "$need_mib" ]; then
-            echo "::error::26/steps/setup.walk declares no memory_mb, so this check cannot say whether the guest fits"
+            need_mib=$(grep -m1 'memory_mb' 26/steps/setup.walk | awk '{print $NF}' | tr -cd '0-9')
+          fi
+          if [ -z "$need_mib" ]; then
+            echo "::error::26/steps/setup.walk declares no \"-m\" argument and no memory_mb, so this check cannot say whether the guest fits"
             exit 1
           fi
           need_gib=$(( need_mib / 1024 ))
