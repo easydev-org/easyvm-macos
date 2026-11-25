@@ -20,6 +20,31 @@ step "the media this stage boots from is already on disk"
 step "boot the disk"
   boot
     machine "q35,accel=kvm,vmport=off"
+    # THE WRITES GO STRAIGHT TO THE DISK, BECAUSE THREE COPIES DO NOT FIT AND ONE OF THEM WAS GARBAGE.
+    #
+    # `publish` reads the disk AND its diff and writes a THIRD file, so the peak is the sum of three.
+    # MEASURED on run 45611579655, which passed all 36 steps and died in `publish the disk`:
+    #
+    #	disk.qcow2          27.95 GiB   the pulled system, read-only
+    #	run-overlay.qcow2   26.29 GiB   what the guest wrote
+    #	qemu-img convert    42.2 GiB    where the compressed flatten ran out of room
+    #	                    ---------
+    #	                    ~96 GiB     on an 84 GiB runner
+    #
+    # AND THE GUEST'S OWN `df -h /` IN THAT RUN SAID 22 GiB USED. The 26 GiB diff was almost entirely
+    # blocks the guest had already freed: APFS does not hand deletes back to `discard=unmap` while it
+    # runs, so nothing could shrink it, and the third copy had nowhere to go. Removing the sleep
+    # image, the swapfiles and the local snapshots inside the guest freed nothing on the host - that
+    # is measured too, in the step that does it.
+    #
+    # WITH NO DIFF THERE IS NO SECOND COPY: the peak becomes the disk plus its output, about 70 GiB.
+    #
+    # WHAT IT GIVES UP, AND WHY THAT IS ACCEPTABLE HERE: a diff is what lets a failed run leave the
+    # published disk untouched, and what makes a guest's TRIM safe. This stage's writes ARE its
+    # product - it is the stage that turns on Remote Login - and nothing after it reads the bytes it
+    # frees. The `discard=unmap` below now reaches the real disk, which is the point: the blocks the
+    # guest gave back are gone from the file publish has to copy.
+    overlay false
     args [["-m", "12288"], ["-cpu", "Skylake-Client-v4,vendor=GenuineIntel,vmx=off,vmware-cpuid-freq=on,-pdpe1gb,+invtsc,+ssse3,+sse4.2,+popcnt,+avx,+avx2,+aes,+fma,+bmi1,+bmi2,+smep,+xsave,+xsaveopt,+xgetbv1,+movbe,+rdrand,check"], ["-smp", "4,sockets=1,dies=1,cores=4,threads=1"], ["-drive", "if=pflash,format=raw,readonly=on,file=macos.rom"], ["-drive", "if=pflash,format=raw,file=macos.vars"], ["-drive", "file=boot.img,format=raw,if=none,id=oc"], ["-device", "virtio-blk-pci,drive=oc,bootindex=0"], ["-chardev", "socket,id=qga0,path=qga.sock,server=on,wait=off"], ["-device", "isa-serial,chardev=qga0"], ["-device", "qemu-xhci,id=xhci"], ["-device", "usb-tablet,bus=xhci.0"], ["-device", "usb-kbd,bus=xhci.0"], ["-drive", "file=disk.qcow2,if=none,format=qcow2,discard=unmap,id=target"], ["-device", "virtio-blk-pci,drive=target,bootindex=1"], ["-global", "ICH9-LPC.disable_s3=1"], ["-global", "ICH9-LPC.disable_s4=1"], ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"], ["-rtc", "base=utc"], ["-smbios", "type=2"], ["-device", "vmware-svga"], ["-audiodev", "none,id=snd0"], ["-device", "usb-audio,bus=xhci.0,audiodev=snd0"], ["-device", "isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"], ["-netdev", "tap,id=net0,ifname=qemutap0,script=no,downscript=no"], ["-device", "virtio-net-pci,netdev=net0,mac=52:54:00:56:4d:01,romfile=,host_mtu=1450"]]
     timeout 900
 step "answer the wizard until the desktop appears"
