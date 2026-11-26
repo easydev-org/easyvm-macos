@@ -188,7 +188,15 @@ step "answer the wizard until the desktop appears"
           name welcome
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [[welcome, to, your, mac]]
+          # `[[welcome, to, mac]]` - MEASURED FROM THE SCREEN, NOT GUESSED. The pane reads
+          # "Welcome to Mac", with NO "your": an earlier fix tightened this from the flat
+          # `[welcome, mac]` (which matched the Terms page's "macOS") to `[[welcome, to, your, mac]]`
+          # and guessed a word the pane does not carry, so the branch could never fire and the wizard
+          # sat on that pane for 66 minutes (run 45773302724, whose last frame is "Welcome to Mac").
+          #
+          # `welcome` and `to` and `mac` together still cannot match the licence text, which has no
+          # "welcome to".
+          words [[welcome, to, mac]]
       item "classify - keyboard"
         check
           source pane
@@ -349,8 +357,11 @@ step "answer the wizard until the desktop appears"
       item "welcome to mac"
         if welcome
           then
+            # 960 958, MEASURED OFF THE FRAME: the round Continue button's centre is (959, 958) in
+            # the 1920x1080 recording. The previous 960,990 was 32 px lower, at the circle's bottom
+            # edge - close enough to look right on paper and not a coordinate anybody had clicked.
             item "welcome continue"
-              input 960 990
+              input 960 958
               settle 12
       item "the keyboard assistant, which eats the next keystroke"
         if keyboard
