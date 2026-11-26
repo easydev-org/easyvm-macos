@@ -854,9 +854,42 @@ step "note what is absent"
   # sends the command AND tolerates the connection ending. This file now uses it too, and the
   # `wait_until: stopped` after it is what actually confirms the machine went down.
 
+# macOS SHUTS ITSELF DOWN HERE, AND THE REASON IS THE DIFF, NOT POLITENESS.
+#
+# `stop ssh` SENDS `poweroff`, AND `poweroff` IS NOT A SYNONYM FOR A REAL SHUTDOWN HERE:
+#
+#	vmuser is the ssh user and is NOT root      macOS `shutdown`/`halt`/`reboot` need root
+#	so `poweroff` either fails or is refused     and `Stop` then waits `shutdownTimeout` (5 min)
+#	waitForExit KILLS qemu at the deadline       its own words: "the guest did not power off within
+#	                                             ...; killing it - the disk will need a journal replay"
+#
+# A KILLED GUEST NEVER RUNS ITS OWN SHUTDOWN SEQUENCE, and that is exactly the sequence that hands the
+# blocks APFS freed during the wizard back to the host's `discard=unmap`. The measurement that says so:
+#
+#	local, same clean base, same 63 steps:  diff 3142 MiB  -> product 15.17 GiB
+#	CI,    same clean base, same 63 steps:  diff 23950 MiB -> product 33.10 GiB
+#
+# 7.6x the writes for the same work, which is what a disk that is never trimmed and never cleanly
+# unmounted looks like.
+#
+# SO THE GUEST IS ASKED TO SHUT DOWN AS ROOT, and the command is allowed to return whatever it returns:
+# `shutdown` closes the session it was read over, so its exit status is meaningless (the same problem
+# 44450353655 recorded for `poweroff`). `wait_until stopped` is what confirms it went down, and the
+# `stop kill` after it is unreachable unless the guest is already gone - `Stop` returns immediately
+# when qemu is not alive.
+step "ask macOS to shut itself down as root"
+  ssh "( sleep 3; printf '%s\\n' \"{{ password }}\" | sudo -S shutdown -h now ) > /tmp/shutdown.log 2>&1 & sleep 2; echo SHUTDOWN_ASKED"
+  timeout 180
+
+
+step "the guest is going down, wait for it"
+  wait_until stopped
+  timeout 300
+
+
 step "stop the machine"
   stop ssh
-  timeout 300
+  timeout 60
 
 
 step "wait for the machine to stop"
