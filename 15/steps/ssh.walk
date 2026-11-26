@@ -45,382 +45,477 @@ step "boot the disk"
     # TRIM cannot reach the base. Both were given away here for a peak that no longer exists.
     args [["-m", "12288"], ["-cpu", "Skylake-Client-v4,vendor=GenuineIntel,vmx=off,vmware-cpuid-freq=on,-pdpe1gb,+invtsc,+ssse3,+sse4.2,+popcnt,+avx,+avx2,+aes,+fma,+bmi1,+bmi2,+smep,+xsave,+xsaveopt,+xgetbv1,+movbe,+rdrand,check"], ["-smp", "4,sockets=1,dies=1,cores=4,threads=1"], ["-drive", "if=pflash,format=raw,readonly=on,file=macos.rom"], ["-drive", "if=pflash,format=raw,file=macos.vars"], ["-drive", "file=boot.img,format=raw,if=none,id=oc"], ["-device", "virtio-blk-pci,drive=oc,bootindex=0"], ["-chardev", "socket,id=qga0,path=qga.sock,server=on,wait=off"], ["-device", "isa-serial,chardev=qga0"], ["-device", "qemu-xhci,id=xhci"], ["-device", "usb-tablet,bus=xhci.0"], ["-device", "usb-kbd,bus=xhci.0"], ["-drive", "file=disk.qcow2,if=none,format=qcow2,discard=unmap,id=target"], ["-device", "virtio-blk-pci,drive=target,bootindex=1"], ["-global", "ICH9-LPC.disable_s3=1"], ["-global", "ICH9-LPC.disable_s4=1"], ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"], ["-rtc", "base=utc"], ["-smbios", "type=2"], ["-device", "vmware-svga"], ["-audiodev", "none,id=snd0"], ["-device", "usb-audio,bus=xhci.0,audiodev=snd0"], ["-device", "isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"], ["-netdev", "tap,id=net0,ifname=qemutap0,script=no,downscript=no"], ["-device", "virtio-net-pci,netdev=net0,mac=52:54:00:56:4d:01,romfile=,host_mtu=1450"]]
     timeout 900
-step "answer the wizard until the desktop appears"
+# THE WIZARD IS A FIXED SEQUENCE, SO IT IS WRITTEN AS ONE - ONE PAGE PER STEP, NO LOOP.
+#
+# MEASURED TWICE FROM THE RECORDINGS (run 45773302724 and run 45791461278). The panes arrive in the
+# same order on both, every time:
+#
+#	country -> transfer -> languages -> accessibility -> data & privacy -> account ->
+#	apple sheet -> terms -> location -> time zone -> analytics -> screen time -> look -> update
+#
+# THE LOOP THIS REPLACES RE-READ THE SCREEN AND RE-ASKED ALL SEVENTEEN CHECKS ON EVERY PASS, and each
+# check was a full OCR of a 1920x1080 frame. A linear sequence of fourteen panes cost thirty to seventy
+# minutes depending on how many passes it needed. A sequence has no such cost: each page is waited for
+# once, answered once, and the next page is waited for.
+#
+# WHY THE ORDER IS RELIABLE ENOUGH TO WRITE DOWN. The loop existed because the Setup Assistant was
+# assumed to be unpredictable. The recordings say otherwise: run 45791461278 crossed thirteen panes in
+# nineteen rounds, every one a NEW pane, with none visited twice.
+#
+# EACH PAGE IS TWO STEPS, BECAUSE A STEP DOES ONE THING: one waits for the pane's own title, the next
+# answers it. A page that never arrives fails in its waiting step, naming the title it wanted - where
+# the loop would have re-tried it silently until its cap, which is how run 45773302724 spent 66
+# minutes on one pane.
+
+# THE FIRST PAGE TAKES MINUTES, NOT SECONDS: the guest is still booting when this step starts, and
+# macOS spends two to five minutes in the boot before the Setup Assistant draws anything.
+#
+# MEASURED on the local probe: `boot:` returns as soon as qemu is up (412 ms), and the frame two
+# seconds later is still black. A `settle` here has to cover the whole boot, because the page it is
+# waiting for cannot appear until the boot is done.
+step "wait for the country or region page"
   repeat
     do
-      item "read the pane"
-        read
-          name pane
-      item "classify - analytics"
-        check
-          source pane
-          mode text
-          name analytics
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[share, analytics, with, apple]]
-      item "classify - data and privacy"
-        check
-          source pane
-          mode text
-          name privacy_pane
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[privacy, fundamental]]
-      item "classify - spoken languages"
-        check
-          source pane
-          mode text
-          name languages
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[spoken, languages]]
-      item "classify - accessibility"
-        check
-          source pane
-          mode text
-          name accessibility
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[accessibility, individual]]
-      item "classify - transfer"
-        check
-          source pane
-          mode text
-          name transfer
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[transfer, your, information, to, this, mac]]
-      item "classify - country"
-        check
-          source pane
-          mode text
-          name country
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[select, your, country, or, region]]
-      # `create, a, mac, account` IS ON TWO PAGES AND THE LOCAL ONE HAS TO BE TOLD FROM THE OTHER.
-      #
-      # MEASURED on run 45757973056 (99 minutes, cancelled), whose mp4 sits on "Sign In to Your Apple
-      # Account" and whose daemon.log repeats, round after round:
-      #
-      #	[18.8]: account = true (read "create a mac account")   <- ON THE APPLE PAGE
-      #	[18.25]: account is true -> running 7 step(s)
-      #	clicked (945,447) / typed / clicked (850,531) / typed / clicked (1306,810)
-      #
-      # The Apple pane carries "Create new Apple Account" and "This Mac will be associated with your
-      # Apple Account", so the four generic words are all present there too. The branch then typed the
-      # LOCAL account's user and password into the Apple ID fields and pressed Continue, which answers
-      # "An unknown error occurred", and the pane never advanced - so the next round did it again.
-      #
-      # `here` IS THE DISCRIMINATOR: the local pane says "The password you create here will be used to
-      # unlock your Mac and approve...", and the Apple pane says nothing with "here" in it. One word,
-      # taken from the page that owns the branch.
-      item "classify - account"
-        check
-          source pane
-          mode text
-          name account
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[create, a, mac, account, here]]
-      item "classify - location"
-        check
-          source pane
-          mode text
-          name location
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[enable, location, services]]
-      item "classify - screen time"
-        check
-          source pane
-          mode text
-          name screen_time
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[screen, time]]
-      item "classify - time zone"
-        check
-          source pane
-          mode text
-          name time_zone
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[time, zone]]
-      item "classify - look"
-        check
-          source pane
-          mode text
-          name look
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[choose, your, look]]
-      # THE THREE CHECKS BELOW WERE TOO LOOSE AND IT COST A WHOLE RUN.
-      #
-      # MEASURED on run 45740428755, at the Terms and Conditions pane. One reading answered:
-      #
-      #	[8.13] terms         = true (read "terms")
-      #	[8.14] welcome       = true (read "mac")        <- the licence says "macOS" twelve times
-      #	[8.16] apple_account = true (read "in")         <- "in" is in every sentence of a licence
-      #	[8.17] apple_sheet   = true (read "are")        <- so is "are"
-      #
-      # SO FOUR BRANCHES RAN ON ONE PANE, and the `welcome` clicks - which belong to a page two steps
-      # later - landed on the licence text. The pane never advanced and the run spent fifty minutes
-      # there until it was cancelled.
-      #
-      # EACH NOW REQUIRES THE PHRASE ITS OWN PAGE CARRIES, and macos 26 had already been fixed this
-      # way: `welcome` needs `welcome to your mac`, `apple_account` needs `sign in to your apple
-      # account` (NOT `... account id` - see the note below on that mistake), and the confirmation
-      # sheet needs the sheet's own `sure skip signing`.
-      item "classify - terms"
-        check
-          source pane
-          mode text
-          name terms
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[terms, conditions]]
-      item "classify - welcome"
-        check
-          source pane
-          mode text
-          name welcome
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          # `[[welcome, to, mac]]` - MEASURED FROM THE SCREEN, NOT GUESSED. The pane reads
-          # "Welcome to Mac", with NO "your": an earlier fix tightened this from the flat
-          # `[welcome, mac]` (which matched the Terms page's "macOS") to `[[welcome, to, your, mac]]`
-          # and guessed a word the pane does not carry, so the branch could never fire and the wizard
-          # sat on that pane for 66 minutes (run 45773302724, whose last frame is "Welcome to Mac").
-          #
-          # `welcome` and `to` and `mac` together still cannot match the licence text, which has no
-          # "welcome to".
-          words [[welcome, to, mac]]
-      item "classify - keyboard"
-        check
-          source pane
-          mode text
-          name keyboard
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[keyboard, assistant]]
-      item "classify - apple account"
-        check
-          source pane
-          mode text
-          name apple_account
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          # NO `id` IN THIS LIST, AND THE `id` WAS THE WHOLE BUG.
-          #
-          # MEASURED on run 45757973056: the pane's title is "Sign In to Your Apple Account" - there
-          # is no standalone word "id" in it - while `words:` requires EVERY word. So the check was
-          # false on the one page it existed to recognise:
-          #
-          #	[19.16]: apple_account = false (none of "sign in to your apple account id" in
-          #	         "... Sign In to Your Apple Account ...")
-          #
-          # and the `if apple_account` branch that clicks "Set Up Later" never ran, for 99 minutes.
-          # macos 26 already wrote it without `id` and its ssh leg passes; this is that line.
-          words [[sign, in, to, your, apple, account]]
-      item "classify - the apple account sheet"
-        check
-          source pane
-          mode text
-          name apple_sheet
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[sure, skip, signing]]
-      item "classify - update"
-        check
-          source pane
-          mode text
-          name update
-          rect [0, 0, 1920, 1080]
-          rect_at [1920, 1080]
-          scale 1
-          words [[update, mac, automatically]]
-      item "analytics - untick sharing first"
-        if analytics
-          then
-            item "untick share analytics"
-              input 808 513
-              settle 3
-            item "analytics continue"
-              input 1306 810
-              settle 10
-      item "data and privacy"
-        if privacy_pane
-          then
-            item "privacy continue"
-              input 1306 810
-              settle 8
-      item "spoken languages"
-        if languages
-          then
-            item "languages continue"
-              input 1306 810
-              settle 8
-      item "accessibility"
-        if accessibility
-          then
-            item "accessibility not now"
-              input 1306 806
-              settle 12
-      item "transfer your data"
-        if transfer
-          then
-            item "choose not to transfer"
-              input 825 669
-              settle 4
-            item "transfer continue"
-              input 1306 810
-              settle 10
-      item "country or region"
-        if country
-          then
-            item "focus the country list"
-              input 900 500
-              settle 2
-            item "type the country"
-              input 900 500
-              settle 1
-            item "country text"
-              settle 3
-              input text "united states"
-            item "country continue"
-              input 1306 810
-              settle 8
-      item "the account, which is what this whole stage exists for"
-        if account
-          then
-            item "account user name"
-              input 945 447
-              settle 2
-            item "account user text"
-              settle 3
-              input text "{{ user }}"
-            item "account password"
-              input 850 531
-              settle 2
-            item "account password text"
-              settle 3
-              input text "{{ password }}"
-            item "account verify"
-              input 1086 531
-              settle 2
-            item "account verify text"
-              settle 3
-              input text "{{ password }}"
-            item "account continue"
-              input 1306 810
-              settle 180
-      item "location services"
-        if location
-          then
-            item "location continue"
-              input 1306 810
-              settle 6
-            item "dont use focus"
-              input 960 632
-              settle 3
-            item "dont use confirm"
-              input ret
-              settle 6
-      item "screen time"
-        if screen_time
-          then
-            item "screen time later"
-              input 619 806
-              settle 8
-      item "time zone"
-        if time_zone
-          then
-            item "time zone continue"
-              input 1306 806
-              settle 10
-      item "choose your look"
-        if look
-          then
-            item "look continue"
-              input 1306 805
-              settle 12
-      item "terms and conditions"
-        if terms
-          then
-            item "terms agree"
-              input 1298 806
-              settle 8
-            item "licence agree"
-              input 1019 616
-              settle 10
-      item "welcome to mac"
-        if welcome
-          then
-            # 960 958, MEASURED OFF THE FRAME: the round Continue button's centre is (959, 958) in
-            # the 1920x1080 recording. The previous 960,990 was 32 px lower, at the circle's bottom
-            # edge - close enough to look right on paper and not a coordinate anybody had clicked.
-            item "welcome continue"
-              input 960 958
-              settle 12
-      item "the keyboard assistant, which eats the next keystroke"
-        if keyboard
-          then
-            item "keyboard continue"
-              input 1222 818
-              settle 12
-      item "apple account - set up later"
-        if apple_account
-          then
-            item "apple account later"
-              input 619 806
-              settle 10
-      item "the apple account confirmation sheet"
-        if apple_sheet
-          then
-            item "skip the apple account"
-              input 1018 641
-              settle 10
-      item "update mac automatically"
-        if update
-          then
-            item "update continue"
-              input 1306 810
-              settle 15
-      item
-        settle 2
       item "read the screen"
         read
-          name wizard
+          name pane
     until
-      bind finished
-      source wizard
+      bind up
+      source pane
       mode text
-      rect [31, 0, 119, 40]
+      rect [0, 0, 1920, 1080]
       rect_at [1920, 1080]
-      without [continue, back, later]
-      words [finder]
-    # 90, WHICH IS WHAT macos 26 USES. MEASURED: eight attempts of this same wizard took fifty
-    # minutes, so 40 attempts would need four hours - and the job would die first, which is exactly
-    # what an earlier run did. The walk's own cap is what should decide.
+      scale 1
+      words [[select, your, country, or, region]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
     max 90
+
+step "answer the country or region page"
+  do
+    item
+      input 900 500
+      settle 2
+    item
+      input text "united states"
+      settle 4
+    item
+      input 1306 810
+      settle 10
+
+step "wait for the transfer page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[transfer, your, information, to, this, mac]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the transfer page"
+  do
+    item
+      input 825 669
+      settle 4
+    item
+      input 1306 810
+      settle 10
+
+step "wait for the spoken languages page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[spoken, languages]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the spoken languages page"
+  do
+    item
+      input 1306 810
+      settle 10
+
+step "wait for the accessibility page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[accessibility, individual]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the accessibility page"
+  do
+    item
+      input 1306 806
+      settle 12
+
+step "wait for the data and privacy page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[privacy, fundamental]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the data and privacy page"
+  do
+    item
+      input 1306 810
+      settle 10
+
+step "wait for the create a mac account page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[create, a, mac, account, here]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 60
+
+# THE SETTLE GOES BEFORE THE TEXT, NOT AFTER IT. MEASURED on the local run at step 14/61: the frame
+# after this step showed "Create a Mac Account" with the Full name field FOCUSED AND EMPTY - the click
+# had landed and the typing had not. The loop this replaced wrote it the other way round:
+#
+#	item "account user text"
+#	  settle 3            <- wait for the click's focus to take
+#	  input text "..."
+#
+# so the field was given three seconds to become the keyboard's target before any key was sent. Here
+# the settle was on the far side, and the keys went to a window that had not taken focus yet.
+step "answer the create a mac account page"
+  do
+    item
+      input 945 447
+      settle 5
+    item
+      settle 3
+      input text "{{ user }}"
+    item
+      settle 2
+    item
+      input 850 531
+      settle 5
+    item
+      settle 3
+      input text "{{ password }}"
+    item
+      settle 2
+    item
+      input 1086 531
+      settle 5
+    item
+      settle 3
+      input text "{{ password }}"
+    item
+      settle 3
+    item
+      input 1306 810
+      settle 180
+
+# SKIPPING THE APPLE ACCOUNT IS TWO CLICKS, AND THE FIRST ONE WAS MISSING.
+#
+# MEASURED across runs 4 and 5. The pane "Sign In to Your Apple Account" has its way out at the
+# BOTTOM LEFT - `Set Up Later` at (615, 808) - and clicking it raises a SECOND sheet:
+#
+#	Are you sure you want to skip signing in with an Apple Account?
+#	[ Don't Skip ]   [ Skip ]
+#
+# The walk only had the second click (1018, 641). With no sheet on screen that click landed on the
+# Sign In pane itself, and the sheet then appeared ON TOP OF EVERY LATER STEP: run 5's recording is
+# that sheet from 13:08 to the end, with each subsequent click (migration assistant, login field,
+# password, return) landing on it or behind it.
+step "set the apple account up later"
+  input 615 808
+  settle 10
+
+
+step "wait for the apple account confirmation sheet"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[sure, skip, signing]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the apple account confirmation sheet"
+  do
+    item
+      input 1018 641
+      settle 10
+
+step "wait for the terms and conditions page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[terms, conditions]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the terms and conditions page"
+  do
+    item
+      input 1298 806
+      settle 8
+    item
+      input 1019 616
+      settle 10
+
+step "wait for the location services page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[enable, location, services]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the location services page"
+  do
+    item
+      input 1306 810
+      settle 6
+    item
+      input 960 632
+      settle 3
+    item
+      input ret
+      settle 6
+
+step "wait for the time zone page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[time, zone]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the time zone page"
+  do
+    item
+      input 1306 806
+      settle 10
+
+step "wait for the analytics page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[share, analytics, with, apple]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the analytics page"
+  do
+    item
+      input 808 513
+      settle 3
+    item
+      input 1306 810
+      settle 10
+
+step "wait for the screen time page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[screen, time]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the screen time page"
+  do
+    item
+      input 619 806
+      settle 8
+
+step "wait for the choose your look page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[choose, your, look]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 45
+
+step "answer the choose your look page"
+  do
+    item
+      input 1299 810
+      settle 12
+
+step "wait for the update mac automatically page"
+  repeat
+    do
+      item "read the screen"
+        read
+          name pane
+    until
+      bind up
+      source pane
+      mode text
+      rect [0, 0, 1920, 1080]
+      rect_at [1920, 1080]
+      scale 1
+      words [[update, mac, automatically]]
+    # 2s between reads: the engine's own default, said out loud.
+    pause 2
+    max 60
+
+step "answer the update mac automatically page"
+  do
+    item
+      input 1306 810
+      settle 15
+
+
+# THE WIZARD HAS ONE MORE PAGE, AND IT IS THE ONE NOBODY EXPECTED: THE MIGRATION ASSISTANT.
+#
+# MEASURED from run 3's recording (t=960s), after `answer the update mac automatically page`:
+#
+#	Transfer information to this Mac
+#	Select a Mac, Time Machine backup, or other startup disk to transfer its information to this Mac.
+#	                       [mnt1  !]
+#	                       Other Server...
+#	Not now                                    [ Back ]  [ Continue ]
+#
+# AND ITS `mnt1` IS A WARNING: clicking it (or Continue) opens
+#
+#	The selected source cannot be used for migration.
+#	Volume contains a macOS or OS X installation which may be damaged.
+#	                                  [ OK ]
+#
+# The way past is `Not now` at the BOTTOM LEFT, which no other page in this wizard has - every earlier
+# pane puts its forward control at the bottom right.
+#
+# WITHOUT THIS STEP THE WALK IS OFF BY ONE PANE FOR EVERYTHING AFTER IT: it pressed Escape and
+# Command-Q while the wizard was still open, macOS answered with
+#
+#	Do you want to shut down your computer?
+#	You haven't finished setting up macOS.
+#	[ Cancel ]  [ Shut Down ]
+#
+# and the "software licence" step then clicked (1307,805) - the wizard's Continue - on a page that was
+# not a licence at all.
+step "skip the migration assistant"
+  input 606 808
+  settle 15
+
+
+
 
 
 step "dismiss anything over the login window"
@@ -443,26 +538,59 @@ step "press return"
   settle 20
 
 
+# NO `meta_l+q` HERE. It was in the loop this replaces, and MEASURED on run 3 it is the one keystroke
+# that must not be sent blind: with the wizard still open, Command-Q raises
+#
+#	Do you want to shut down your computer?
+#	You haven't finished setting up macOS.
+#	[ Cancel ]  [ Shut Down ]
+#
+# which then swallows every later click. Escape closes the "what's new" and notification overlays and
+# cannot shut the machine down, so the dismissal is Escape three times with a click on the empty
+# desktop between them to take the focus away from any sheet.
 step "dismiss the overlays macOS puts up on a first login"
   do
     item
-      input 1228 826
-      settle 4
+      input esc
+      settle 3
     item
       input 1228 826
-      settle 4
-    item
-      input 1228 826
-      settle 4
+      settle 3
     item
       input esc
-      settle 2
+      settle 3
     item
-      input meta_l+q
-      settle 2
+      input 1228 826
+      settle 3
     item
       input esc
-      settle 2
+      settle 3
+
+
+# THE SOFTWARE LICENCE COMES BACK AFTER THE FIRST LOGIN, AND IT BLOCKS THE DESKTOP.
+#
+# MEASURED on the local run at step 36/61: the frame during `wait for the desktop` is
+#
+#	Terms and Conditions
+#	... PLEASE READ THIS SOFTWARE LICENSE AGREEMENT ...
+#	                                          [ Back ]  [ Agree ]
+#
+# THE WIZARD'S OWN TERMS PAGE WAS ALREADY ANSWERED at step 18. THIS IS A SECOND, DIFFERENT ONE - the
+# licence macOS shows to the first user who logs in - and nothing in the walk answered it, so the loop
+# waited for a Finder menu behind a modal sheet that would never close.
+#
+# (1307, 805) IS MEASURED FROM THAT FRAME: the Agree button's centre in the 1920x1080 capture. The
+# wizard's terms step uses (1298, 806), which is the same control on a differently laid-out page.
+step "wait for the software licence the first login shows"
+  # 30s, MEASURED: run 2's journal has the licence on screen by 12:12:40, which is immediately after
+  # `dismiss the overlays` finishes (12:12:21 press return + 20s, then 19s of overlay clicks). The
+  # settle covers the sheet's own animation on top of that.
+  settle 30
+
+
+step "accept the software licence the first login shows"
+  input 1307 805
+  settle 20
 
 
 step "wait for the desktop"
@@ -577,36 +705,61 @@ step "the remote login result is on screen"
     max 45
 
 
+# THE RESULT ROW IS AT y=303, NOT y=336, AND THE PAGE IT OPENS SAYS SOMETHING ELSE.
+#
+# MEASURED on the local run: after searching "remote login" in System Settings, the result row sits at
+# (677, 303) in the 1920x1080 capture. This step used to click (703, 336), 33 px low, so the detail
+# pane never opened - which is why the gate after it waited thirty times for a page that was never
+# there.
+#
+# THE GATE WAS ALSO ASKING ABOUT A DIFFERENT PANE. `allow full disk access` belongs to the Privacy
+# page; the Remote Login sheet says "lets users of other computers access your Mac". macos 26's walk
+# has always waited for that sentence, and this file now does too.
 step "open the remote login pane"
-  input 703 336
-  settle 12
-
-
-step "open the remote login pane again"
-  input 703 336
-  rect [726, 300, 1200, 715]
-  rect_at [1920, 1080]
-  scale 2
-  settle 12
-  when_not [allow, full, disk, access]
-
-
-step "the remote login pane is up"
   repeat
     do
-      item
-        settle 3
+      # (677, 335) IS THE `Remote login` ROW, AND IT IS THE SECOND ONE. The first result row is
+      # `Sharing` at y=303, and clicking that opens the Sharing pane - MEASURED on run 7, whose frame
+      # shows `Sharing` highlighted in blue with Remote login directly beneath it. An earlier fix
+      # moved this from 336 to 303 and pointed it at the wrong row entirely; 336 was right and the
+      # GATE was what needed changing.
+      item "click the search result"
+        input 677 335
+        settle 5
       item "read the screen"
         read
           name screen
     until
-      bind done
+      bind sheet
       source screen
       mode text
-      rect [731, 395, 907, 453]
+      # THE REGION IS THE SHEET'S TWO-LINE HEADER, NOT THE WHOLE PANE.
+      #
+      # MEASURED on run 8: with `rect [600,150,1600,900]` - the region macos 26 uses - the OCR of THIS
+      # guest's sheet returned
+      #
+      #	k , Remote Login: Off 'computer using SSH and SFTP. ...
+      #
+      # and dropped `lets users of other computers access this` entirely, so the gate never matched a
+      # sheet that was open on screen. THE SAME FRAME READ THROUGH A TIGHT CROP:
+      #
+      #	$ tesseract <crop 750,330-1200,390> -
+      #	Remote Login: Off
+      #	Remote Login lets users of other computers access this
+      #	computer using SSH and SFTP.
+      #
+      # 15's sheet is a CENTRED DIALOG about 465x410 px, not the full-height pane 26 shows, so the
+      # wide region spends most of its pixels on the dimmed System Settings behind it and the small
+      # text in the middle is what gets lost.
+      rect [750, 330, 1200, 390]
       rect_at [1920, 1080]
-      words [[allow, full, disk, access]]
-    max 30
+      # scale 1, NOT 2: MEASURED on this frame, the same crop at 2x reads
+      # `i= Remote Login: Off (` / `[> | . . NN` - the enlargement adds noise to text that is already
+      # legible, which is the opposite of what `scale:` is for.
+      scale 1
+      words [[lets, users, of, other, computers]]
+    max 12
+
 
 
 step "turn remote login on"
