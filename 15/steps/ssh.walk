@@ -58,6 +58,7 @@ step "answer the wizard until the desktop appears"
           name analytics
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[share, analytics, with, apple]]
       item "classify - data and privacy"
         check
@@ -66,6 +67,7 @@ step "answer the wizard until the desktop appears"
           name privacy_pane
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[privacy, fundamental]]
       item "classify - spoken languages"
         check
@@ -74,6 +76,7 @@ step "answer the wizard until the desktop appears"
           name languages
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[spoken, languages]]
       item "classify - accessibility"
         check
@@ -82,6 +85,7 @@ step "answer the wizard until the desktop appears"
           name accessibility
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[accessibility, individual]]
       item "classify - transfer"
         check
@@ -90,6 +94,7 @@ step "answer the wizard until the desktop appears"
           name transfer
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[transfer, your, information, to, this, mac]]
       item "classify - country"
         check
@@ -98,6 +103,7 @@ step "answer the wizard until the desktop appears"
           name country
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[select, your, country, or, region]]
       # `create, a, mac, account` IS ON TWO PAGES AND THE LOCAL ONE HAS TO BE TOLD FROM THE OTHER.
       #
@@ -123,6 +129,7 @@ step "answer the wizard until the desktop appears"
           name account
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[create, a, mac, account, here]]
       item "classify - location"
         check
@@ -131,6 +138,7 @@ step "answer the wizard until the desktop appears"
           name location
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[enable, location, services]]
       item "classify - screen time"
         check
@@ -139,6 +147,7 @@ step "answer the wizard until the desktop appears"
           name screen_time
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[screen, time]]
       item "classify - time zone"
         check
@@ -147,6 +156,7 @@ step "answer the wizard until the desktop appears"
           name time_zone
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[time, zone]]
       item "classify - look"
         check
@@ -155,6 +165,7 @@ step "answer the wizard until the desktop appears"
           name look
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[choose, your, look]]
       # THE THREE CHECKS BELOW WERE TOO LOOSE AND IT COST A WHOLE RUN.
       #
@@ -180,6 +191,7 @@ step "answer the wizard until the desktop appears"
           name terms
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[terms, conditions]]
       item "classify - welcome"
         check
@@ -188,6 +200,7 @@ step "answer the wizard until the desktop appears"
           name welcome
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           # `[[welcome, to, mac]]` - MEASURED FROM THE SCREEN, NOT GUESSED. The pane reads
           # "Welcome to Mac", with NO "your": an earlier fix tightened this from the flat
           # `[welcome, mac]` (which matched the Terms page's "macOS") to `[[welcome, to, your, mac]]`
@@ -204,6 +217,7 @@ step "answer the wizard until the desktop appears"
           name keyboard
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[keyboard, assistant]]
       item "classify - apple account"
         check
@@ -212,6 +226,7 @@ step "answer the wizard until the desktop appears"
           name apple_account
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           # NO `id` IN THIS LIST, AND THE `id` WAS THE WHOLE BUG.
           #
           # MEASURED on run 45757973056: the pane's title is "Sign In to Your Apple Account" - there
@@ -231,6 +246,7 @@ step "answer the wizard until the desktop appears"
           name apple_sheet
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[sure, skip, signing]]
       item "classify - update"
         check
@@ -239,6 +255,7 @@ step "answer the wizard until the desktop appears"
           name update
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
+          scale 1
           words [[update, mac, automatically]]
       item "analytics - untick sharing first"
         if analytics
