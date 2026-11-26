@@ -58,7 +58,7 @@ step "answer the wizard until the desktop appears"
           name analytics
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [analytics, improve]
+          words [[share, analytics, with, apple]]
       item "classify - data and privacy"
         check
           source pane
@@ -66,7 +66,7 @@ step "answer the wizard until the desktop appears"
           name privacy_pane
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [privacy, fundamental]
+          words [[privacy, fundamental]]
       item "classify - spoken languages"
         check
           source pane
@@ -74,7 +74,7 @@ step "answer the wizard until the desktop appears"
           name languages
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [spoken, languages]
+          words [[spoken, languages]]
       item "classify - accessibility"
         check
           source pane
@@ -82,7 +82,7 @@ step "answer the wizard until the desktop appears"
           name accessibility
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [accessibility, individual]
+          words [[accessibility, individual]]
       item "classify - transfer"
         check
           source pane
@@ -90,7 +90,7 @@ step "answer the wizard until the desktop appears"
           name transfer
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [transfer, data]
+          words [[transfer, your, information, to, this, mac]]
       item "classify - country"
         check
           source pane
@@ -98,7 +98,7 @@ step "answer the wizard until the desktop appears"
           name country
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [country, region]
+          words [[select, your, country, or, region]]
       item "classify - account"
         check
           source pane
@@ -106,7 +106,7 @@ step "answer the wizard until the desktop appears"
           name account
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [create, mac, account]
+          words [[create, a, mac, account]]
       item "classify - location"
         check
           source pane
@@ -114,7 +114,7 @@ step "answer the wizard until the desktop appears"
           name location
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [approximate, location]
+          words [[enable, location, services]]
       item "classify - screen time"
         check
           source pane
@@ -122,7 +122,7 @@ step "answer the wizard until the desktop appears"
           name screen_time
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [screen, report]
+          words [[screen, time]]
       item "classify - time zone"
         check
           source pane
@@ -130,7 +130,7 @@ step "answer the wizard until the desktop appears"
           name time_zone
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [time, zone]
+          words [[time, zone]]
       item "classify - look"
         check
           source pane
@@ -138,7 +138,7 @@ step "answer the wizard until the desktop appears"
           name look
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [look, appearance]
+          words [[choose, your, look]]
       # THE THREE CHECKS BELOW WERE TOO LOOSE AND IT COST A WHOLE RUN.
       #
       # MEASURED on run 45740428755, at the Terms and Conditions pane. One reading answered:
@@ -162,7 +162,7 @@ step "answer the wizard until the desktop appears"
           name terms
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [terms, conditions]
+          words [[terms, conditions]]
       item "classify - welcome"
         check
           source pane
@@ -178,7 +178,7 @@ step "answer the wizard until the desktop appears"
           name keyboard
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [keyboard, assistant]
+          words [[keyboard, assistant]]
       item "classify - apple account"
         check
           source pane
@@ -202,7 +202,7 @@ step "answer the wizard until the desktop appears"
           name update
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [update, automatically]
+          words [[update, mac, automatically]]
       item "analytics - untick sharing first"
         if analytics
           then
