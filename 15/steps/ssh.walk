@@ -854,47 +854,51 @@ step "note what is absent"
   # sends the command AND tolerates the connection ending. This file now uses it too, and the
   # `wait_until: stopped` after it is what actually confirms the machine went down.
 
-# macOS SHUTS ITSELF DOWN HERE, AND THE REASON IS THE DIFF, NOT POLITENESS.
+# THE MENU BAR SHUTS THE GUEST DOWN, BECAUSE THAT IS THE ONLY SHUTDOWN macOS HONOURS HERE.
 #
-# `stop ssh` SENDS `poweroff`, AND `poweroff` IS NOT A SYNONYM FOR A REAL SHUTDOWN HERE:
+# THE CI LOG OF THE 33.10 GiB RUN SAYS WHAT THE OLD STEP DID (run 45840734390, step 61/63):
 #
-#	vmuser is the ssh user and is NOT root      macOS `shutdown`/`halt`/`reboot` need root
-#	so `poweroff` either fails or is refused     and `Stop` then waits `shutdownTimeout` (5 min)
-#	waitForExit KILLS qemu at the deadline       its own words: "the guest did not power off within
-#	                                             ...; killing it - the disk will need a journal replay"
+#	=== stop the machine
+#	[easyvm]   the guest did not power off within 5m0s; killing it - the disk will need a journal
+#	           replay on its next boot
+#	[easyvm]   released the diff (23950 MiB written this run)
 #
-# A KILLED GUEST NEVER RUNS ITS OWN SHUTDOWN SEQUENCE, and that is exactly the sequence that hands the
-# blocks APFS freed during the wizard back to the host's `discard=unmap`. The measurement that says so:
+# `stop ssh` sends `poweroff`, and `poweroff` from `vmuser` never reached the shutdown path - so `stop`
+# waited its full five minutes and KILLED qemu. A killed guest never runs its own shutdown sequence, and
+# that sequence is what hands the blocks APFS freed back to the host's `discard=unmap`.
 #
-#	local, same clean base, same 63 steps:  diff 3142 MiB  -> product 15.17 GiB
-#	CI,    same clean base, same 63 steps:  diff 23950 MiB -> product 33.10 GiB
+# SO THE GUEST IS SHUT DOWN THE WAY A PERSON SHUTS A MAC DOWN: Apple menu -> Shut Down, then Return for
+# the confirmation if one appears. NO `sudo`, NO `shutdown(8)` - the desktop's own control, because that
+# is the path this media actually implements.
 #
-# 7.6x the writes for the same work, which is what a disk that is never trimmed and never cleanly
-# unmounted looks like.
-#
-# SO THE GUEST IS ASKED TO SHUT DOWN AS ROOT, and the command is allowed to return whatever it returns:
-# `shutdown` closes the session it was read over, so its exit status is meaningless (the same problem
-# 44450353655 recorded for `poweroff`). `wait_until stopped` is what confirms it went down, and the
-# `stop kill` after it is unreachable unless the guest is already gone - `Stop` returns immediately
-# when qemu is not alive.
-step "ask macOS to shut itself down as root"
-  ssh "( sleep 3; printf '%s\\n' \"{{ password }}\" | sudo -S shutdown -h now ) > /tmp/shutdown.log 2>&1 & sleep 2; echo SHUTDOWN_ASKED"
-  timeout 180
+# THE APPLE MENU IS AT THE TOP LEFT. The gate above already proves the bar is there: it reads
+# `finder` inside rect [31, 0, 119, 40], and the Apple logo sits in the same bar to the LEFT of that
+# rect. `input 18 18` is that logo.
+step "open the apple menu"
+  input 18 18
+  settle 3
 
 
-step "the guest is going down, wait for it"
-  wait_until stopped
-  timeout 300
+step "choose shut down from it"
+  input 40 204
+  settle 5
 
 
-step "stop the machine"
-  stop ssh
-  timeout 60
+# A CONFIRMATION IS ANSWERED WITH RETURN, NOT WITH A GUESSED COORDINATE. `Shut Down` is the default
+# button whenever macOS asks, and Return is harmless on the desktop if it does not ask at all.
+step "answer the confirmation if one appears"
+  input ret
+  settle 4
 
 
 step "wait for the machine to stop"
   wait_until stopped
   timeout 300
+
+
+step "stop the machine"
+  stop kill
+  timeout 60
 
 
 step "publish the disk"
