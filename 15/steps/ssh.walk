@@ -99,6 +99,23 @@ step "answer the wizard until the desktop appears"
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
           words [[select, your, country, or, region]]
+      # `create, a, mac, account` IS ON TWO PAGES AND THE LOCAL ONE HAS TO BE TOLD FROM THE OTHER.
+      #
+      # MEASURED on run 45757973056 (99 minutes, cancelled), whose mp4 sits on "Sign In to Your Apple
+      # Account" and whose daemon.log repeats, round after round:
+      #
+      #	[18.8]: account = true (read "create a mac account")   <- ON THE APPLE PAGE
+      #	[18.25]: account is true -> running 7 step(s)
+      #	clicked (945,447) / typed / clicked (850,531) / typed / clicked (1306,810)
+      #
+      # The Apple pane carries "Create new Apple Account" and "This Mac will be associated with your
+      # Apple Account", so the four generic words are all present there too. The branch then typed the
+      # LOCAL account's user and password into the Apple ID fields and pressed Continue, which answers
+      # "An unknown error occurred", and the pane never advanced - so the next round did it again.
+      #
+      # `here` IS THE DISCRIMINATOR: the local pane says "The password you create here will be used to
+      # unlock your Mac and approve...", and the Apple pane says nothing with "here" in it. One word,
+      # taken from the page that owns the branch.
       item "classify - account"
         check
           source pane
@@ -106,7 +123,7 @@ step "answer the wizard until the desktop appears"
           name account
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [[create, a, mac, account]]
+          words [[create, a, mac, account, here]]
       item "classify - location"
         check
           source pane
@@ -152,9 +169,10 @@ step "answer the wizard until the desktop appears"
       # later - landed on the licence text. The pane never advanced and the run spent fifty minutes
       # there until it was cancelled.
       #
-      # EACH NOW REQUIRES THE PHRAASE ITS OWN PAGE CARRIES, and macos 26 had already been fixed this
-      # way: `welcome` needs `welcome to your mac`, `apple_account` needs `apple id`, and the
-      # confirmation sheet needs the sheet's own `sure skip signing`.
+      # EACH NOW REQUIRES THE PHRASE ITS OWN PAGE CARRIES, and macos 26 had already been fixed this
+      # way: `welcome` needs `welcome to your mac`, `apple_account` needs `sign in to your apple
+      # account` (NOT `... account id` - see the note below on that mistake), and the confirmation
+      # sheet needs the sheet's own `sure skip signing`.
       item "classify - terms"
         check
           source pane
@@ -186,7 +204,18 @@ step "answer the wizard until the desktop appears"
           name apple_account
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [[sign, in, to, your, apple, account, id]]
+          # NO `id` IN THIS LIST, AND THE `id` WAS THE WHOLE BUG.
+          #
+          # MEASURED on run 45757973056: the pane's title is "Sign In to Your Apple Account" - there
+          # is no standalone word "id" in it - while `words:` requires EVERY word. So the check was
+          # false on the one page it existed to recognise:
+          #
+          #	[19.16]: apple_account = false (none of "sign in to your apple account id" in
+          #	         "... Sign In to Your Apple Account ...")
+          #
+          # and the `if apple_account` branch that clicks "Set Up Later" never ran, for 99 minutes.
+          # macos 26 already wrote it without `id` and its ssh leg passes; this is that line.
+          words [[sign, in, to, your, apple, account]]
       item "classify - the apple account sheet"
         check
           source pane
