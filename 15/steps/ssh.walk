@@ -139,6 +139,22 @@ step "answer the wizard until the desktop appears"
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
           words [look, appearance]
+      # THE THREE CHECKS BELOW WERE TOO LOOSE AND IT COST A WHOLE RUN.
+      #
+      # MEASURED on run 45740428755, at the Terms and Conditions pane. One reading answered:
+      #
+      #	[8.13] terms         = true (read "terms")
+      #	[8.14] welcome       = true (read "mac")        <- the licence says "macOS" twelve times
+      #	[8.16] apple_account = true (read "in")         <- "in" is in every sentence of a licence
+      #	[8.17] apple_sheet   = true (read "are")        <- so is "are"
+      #
+      # SO FOUR BRANCHES RAN ON ONE PANE, and the `welcome` clicks - which belong to a page two steps
+      # later - landed on the licence text. The pane never advanced and the run spent fifty minutes
+      # there until it was cancelled.
+      #
+      # EACH NOW REQUIRES THE PHRAASE ITS OWN PAGE CARRIES, and macos 26 had already been fixed this
+      # way: `welcome` needs `welcome to your mac`, `apple_account` needs `apple id`, and the
+      # confirmation sheet needs the sheet's own `sure skip signing`.
       item "classify - terms"
         check
           source pane
@@ -154,7 +170,7 @@ step "answer the wizard until the desktop appears"
           name welcome
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [welcome, mac]
+          words [[welcome, to, your, mac]]
       item "classify - keyboard"
         check
           source pane
@@ -170,7 +186,7 @@ step "answer the wizard until the desktop appears"
           name apple_account
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [sign, in, to, your, apple, account]
+          words [[sign, in, to, your, apple, account, id]]
       item "classify - the apple account sheet"
         check
           source pane
@@ -178,7 +194,7 @@ step "answer the wizard until the desktop appears"
           name apple_sheet
           rect [0, 0, 1920, 1080]
           rect_at [1920, 1080]
-          words [are, you, sure]
+          words [[sure, skip, signing]]
       item "classify - update"
         check
           source pane
