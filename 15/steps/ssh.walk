@@ -871,24 +871,48 @@ step "note what is absent"
 # the confirmation if one appears. NO `sudo`, NO `shutdown(8)` - the desktop's own control, because that
 # is the path this media actually implements.
 #
-# THE APPLE MENU IS AT THE TOP LEFT. The gate above already proves the bar is there: it reads
-# `finder` inside rect [31, 0, 119, 40], and the Apple logo sits in the same bar to the LEFT of that
-# rect. `input 18 18` is that logo.
+# THE COORDINATES BELOW WERE MEASURED ON THIS GUEST, NOT GUESSED.
+#
+# MEASURED on the pod, 2026-11-26, by driving /api/click and capturing the frame after each press. THE
+# FIRST VERSION OF THIS STEP USED `40 204` AND `ret`, AND THE RUN PROVED BOTH WRONG:
+#
+#	'easyvm' journal for run 2026-11-26T20-32-55:
+#	  'open the apple menu',                    click 18,18   -> menu OPENED
+#	  'choose shut down from it',               click 40,204  -> MISSED (menu closed, nothing else)
+#	  'answer the confirmation if one appears', key   ret     -> nothing to answer
+#	  then the walk sat at 'wait for the machine to stop' with ssh still answering
+#
+# THE MENU'S OWN FRAME THEN GAVE THE REAL ROW: `Shut Down...` is at y=244, forty pixels BELOW the
+# `Sleep`/`Restart` pair an 204 sat between. And the confirmation sheet that `Shut Down...` raises is
+#
+#	Are you sure you want to shut down your computer now?
+#	If you do nothing, the computer will shut down automatically in 58 seconds.
+#	                                        [ Cancel ]  [ Shut Down ]
+#
+# whose default button is at (1097, 366) - Return does NOT press it, because the sheet takes its answer
+# from the button, not from the keyboard focus the desktop had.
+#
+# THE CLICKS BELOW ARE THE ONES THAT WORKED, in order, on that same live guest:
+#
+#	18,12     the Apple logo        the menu drops down
+#	40,244    Shut Down...          the confirmation sheet appears
+#	1097,366  Shut Down             qemu leaves 'running' and the walk's wait is satisfied
+#
+# And the 58-second countdown is a second way in: if the third click ever misses, the sheet shuts the
+# guest down on its own before the step's budget is spent.
 step "open the apple menu"
-  input 18 18
+  input 18 12
   settle 3
 
 
 step "choose shut down from it"
-  input 40 204
+  input 40 244
   settle 5
 
 
-# A CONFIRMATION IS ANSWERED WITH RETURN, NOT WITH A GUESSED COORDINATE. `Shut Down` is the default
-# button whenever macOS asks, and Return is harmless on the desktop if it does not ask at all.
-step "answer the confirmation if one appears"
-  input ret
-  settle 4
+step "answer the confirmation sheet"
+  input 1097 366
+  settle 5
 
 
 step "wait for the machine to stop"
