@@ -31,11 +31,11 @@ step "wait for sshd"
 
 
 step "copy xcode into the guest"
-  copy Xcode_26.3_Universal.xip /tmp/Xcode.xip
+  scp Xcode_26.3_Universal.xip /tmp/Xcode.xip
 
 
 step "copy run-xcode-install.sh in"
-  copy run-xcode-install.sh /tmp/run-xcode-install.sh
+  scp run-xcode-install.sh /tmp/run-xcode-install.sh
   timeout 300
 
 
@@ -66,15 +66,15 @@ step "remove the xip"
 
 
 step "copy the packages into the guest"
-  copy node.pkg /tmp/node.pkg
+  scp node.pkg /tmp/node.pkg
 
 
 step "copy the python package into the guest"
-  copy python.pkg /tmp/python.pkg
+  scp python.pkg /tmp/python.pkg
 
 
 step "copy install-node.sh in"
-  copy install-node.sh /tmp/install-node.sh
+  scp install-node.sh /tmp/install-node.sh
   timeout 300
 
 
@@ -84,7 +84,7 @@ step "install node"
 
 
 step "copy install-python.sh in"
-  copy install-python.sh /tmp/install-python.sh
+  scp install-python.sh /tmp/install-python.sh
   timeout 300
 
 
@@ -94,7 +94,7 @@ step "install python"
 
 
 step "copy prove-toolchain.sh in"
-  copy prove-toolchain.sh /tmp/prove-toolchain.sh
+  scp prove-toolchain.sh /tmp/prove-toolchain.sh
   timeout 300
 
 
@@ -109,7 +109,7 @@ step "prove xcode is selected"
 
 
 step "copy swift-check.sh in"
-  copy swift-check.sh /tmp/swift-check.sh
+  scp swift-check.sh /tmp/swift-check.sh
   timeout 300
 
 

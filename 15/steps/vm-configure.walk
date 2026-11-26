@@ -42,7 +42,7 @@ step "wait for sshd"
 
 
 step "copy the agent into the guest"
-  copy mac-guest-agent /tmp/mac-guest-agent
+  scp mac-guest-agent /tmp/mac-guest-agent
   timeout 300
 
 
@@ -118,14 +118,14 @@ step "show what the guest sees at the share"
 
 
 step "copy the launcher in"
-  copy
+  scp
     template launcher
     to /tmp/bootstrap-launcher.sh
   timeout 300
 
 
 step "copy the login agent plist in"
-  copy
+  scp
     template macos_agent_plist
     to /tmp/bootstrap.plist
   timeout 300

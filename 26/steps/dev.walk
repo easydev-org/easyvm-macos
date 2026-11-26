@@ -55,11 +55,11 @@ step "copy xcode into the guest"
   # THE .xip IS A PREPARED INPUT, PULLED BY THE WORKFLOW BEFORE THIS FILE RUNS. It used to be a
   # `fetch:` step here, which meant a 1.5 GiB download inside a stage whose job has a wall clock -
   # the same fault that cost run 43847000071 eighteen minutes before its first boot.
-  copy Xcode_26.6_Universal.xip /tmp/Xcode.xip
+  scp Xcode_26.6_Universal.xip /tmp/Xcode.xip
 
 
 step "copy run-xcode-install.sh in"
-  copy run-xcode-install.sh /tmp/run-xcode-install.sh
+  scp run-xcode-install.sh /tmp/run-xcode-install.sh
   timeout 300
 
 
@@ -82,16 +82,16 @@ step "copy the packages into the guest"
   # The stage could not have worked. THE NAMES ON THE RIGHT ARE THE ONES THE INSTALLERS READ, and
   # the ones on the left are what the workflow's `assets:` places; both ends are spelled the same
   # way on purpose.
-  copy node.pkg /tmp/node.pkg
+  scp node.pkg /tmp/node.pkg
 
 
 step "copy the python package into the guest"
   # `scp:` COPIES ONE FILE PER STEP, so the second package needs its own.
-  copy python.pkg /tmp/python.pkg
+  scp python.pkg /tmp/python.pkg
 
 
 step "copy install-node.sh in"
-  copy install-node.sh /tmp/install-node.sh
+  scp install-node.sh /tmp/install-node.sh
   timeout 300
 # NODE FROM nodejs.org, x64 .pkg. The official installer puts it in /usr/local/bin and links
 # node/npm/npx there, which is on the default PATH.
@@ -103,7 +103,7 @@ step "install node"
 
 
 step "copy install-python.sh in"
-  copy install-python.sh /tmp/install-python.sh
+  scp install-python.sh /tmp/install-python.sh
   timeout 300
 # PYTHON FROM python.org, macos11 .pkg - the Intel-capable build. It installs into
 # /Library/Frameworks/Python.framework and links python3 into /usr/local/bin.
@@ -115,7 +115,7 @@ step "install python"
 
 
 step "copy prove-toolchain.sh in"
-  copy prove-toolchain.sh /tmp/prove-toolchain.sh
+  scp prove-toolchain.sh /tmp/prove-toolchain.sh
   timeout 300
 # THE CHECK IS THE PATH, NOT THE VERSION.
 #
@@ -139,7 +139,7 @@ step "prove xcode is selected"
 
 
 step "copy swift-check.sh in"
-  copy swift-check.sh /tmp/swift-check.sh
+  scp swift-check.sh /tmp/swift-check.sh
   timeout 300
 
 
