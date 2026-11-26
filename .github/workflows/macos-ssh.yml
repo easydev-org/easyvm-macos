@@ -101,7 +101,13 @@ jobs:
       #
       # NOTE FOR THE NEXT EDIT: `stages:` IS A JSON ARRAY IN A YAML BLOCK SCALAR. JSON has no
       # comments, so an explanation put between its braces makes the whole stage unparseable and the
-      # workflow is rejected before any job exists - which is what happened to run 45600145134.
+      # workflow is rejected before any job exists - which is what happened to run 45600145134 AND
+      # AGAIN TO 45757879948, where this note was written and then ignored.
+      #
+      # WHY `timeout` IS 400 AND NOT 120: the wizard step is 37 actions per attempt and an attempt is
+      # ~6.5 minutes (MEASURED: eight attempts took fifty minutes in run 45740428755), so the walk's
+      # `max 90` needs far more than two hours. 400 matches macos 26, whose ssh leg passes in 82
+      # minutes. The walk's own `max` is what should end the stage; the job timeout only stops a hang.
       stages: |
         [
           {
@@ -111,10 +117,6 @@ jobs:
             "assets": ["macos-firmware-15:macos-firmware.tar"],
             "out": "macos15-ssh.qcow2",
             "publish": "macos15-ssh",
-            # 400, NOT 120, BECAUSE THE WIZARD IS 37 ACTIONS PER ATTEMPT AND AN ATTEMPT IS ~6 MINUTES.
-            # MEASURED on run 45740428755: eight attempts took fifty minutes, so the `max 90` this walk
-            # now carries needs nine hours of walk time - and the walk's own cap is what should end it,
-            # not the job. macos 26, which passes, is `max 90` under a 400-minute job.
             "timeout": 400
           }
         ]
