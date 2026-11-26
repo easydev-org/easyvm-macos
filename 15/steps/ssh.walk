@@ -360,7 +360,10 @@ step "answer the wizard until the desktop appears"
       rect_at [1920, 1080]
       without [continue, back, later]
       words [finder]
-    max 40
+    # 90, WHICH IS WHAT macos 26 USES. MEASURED: eight attempts of this same wizard took fifty
+    # minutes, so 40 attempts would need four hours - and the job would die first, which is exactly
+    # what an earlier run did. The walk's own cap is what should decide.
+    max 90
 
 
 step "dismiss anything over the login window"

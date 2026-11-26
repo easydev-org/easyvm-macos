@@ -111,6 +111,10 @@ jobs:
             "assets": ["macos-firmware-15:macos-firmware.tar"],
             "out": "macos15-ssh.qcow2",
             "publish": "macos15-ssh",
-            "timeout": 120
+            # 400, NOT 120, BECAUSE THE WIZARD IS 37 ACTIONS PER ATTEMPT AND AN ATTEMPT IS ~6 MINUTES.
+            # MEASURED on run 45740428755: eight attempts took fifty minutes, so the `max 90` this walk
+            # now carries needs nine hours of walk time - and the walk's own cap is what should end it,
+            # not the job. macos 26, which passes, is `max 90` under a 400-minute job.
+            "timeout": 400
           }
         ]
