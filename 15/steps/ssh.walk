@@ -821,37 +821,56 @@ step "note what is absent"
   ssh "command -v brew || true"
 
 
-# THE DISK CARRIES AN APFS SNAPSHOT FROM THE INSTALL, AND macOS BOOTS FROM IT INSTEAD OF THE VOLUME.
+# THE SLEEP IMAGE IS TWELVE GIGABYTES AND IT IS THE DIFFERENCE BETWEEN 15 GiB AND 28 GiB.
 #
-# THIS IS WHY THIS STAGE'S PRODUCTS NEVER REACHED A DESKTOP, AND IT HAS NOTHING TO DO WITH SHUTDOWN,
-# `discard=unmap`, OR THE DIFF.
+# THIS STEP WAS HERE, WAS REMOVED, AND IS BACK WITH THE MEASUREMENT THAT SAYS WHY IT MATTERS.
 #
-# MEASURED on the pod, 2026-11-27, reading the raw image of three disks at the APFS container offset:
+#	`/private/var/vm/sleepimage` is written at hibernatemode 3 with a size near the guest's RAM,
+#	which is 12288 MiB on this machine. TWO PRODUCTS OF THE SAME 63 STEPS, one with this delete and
+#	one without:
 #
-#	                      "vmuser" hits    ".AppleSetupDone"    com.apple.os.update-<sha>
-#	disk-clean.qcow2            0                 2             C3E67B362464 19E7...
-#	15.17 GiB product         177                 9             C3E67B362464 19E7...   <- SAME SNAPSHOT
+#		with it      15.10 GiB product, 19.27 GiB of data extents, empty space from 36 GiB up
+#		without it   27.68 GiB product, 32.36 GiB of data extents (the install disk's own figure)
 #
-# SO THE WIZARD'S WORK *IS* IN THE PRODUCT - an account named vmuser, a written .AppleSetupDone - and
-# `qemu-img compare` against the base confirms both hold the same files. WHAT DOES NOT MOVE IS WHAT
-# macOS READS AT BOOT: `com.apple.os.update-<sha>` IS AN APFS SNAPSHOT the installer's own OS update
-# made, and macOS mounts THE SNAPSHOT as the system volume when one is present. Everything this walk
-# does lands on the live volume, so the next boot shows the Setup Assistant again from the snapshot -
-# which is exactly the frame every "verify the product" run has recorded.
+#	12.6 GiB - the sleep image, to the megabyte.
 #
-# THREE BOOTS CONFIRMED IT: the base disk, the 15.17 GiB product, and a fresh 28.36 GiB product all
-# opened at "Select Your Country or Region", with the same snapshot id in all three images.
+# WHY THE DELETE ACTUALLY HANDS THE CLUSTERS BACK: `discard=unmap` is on the disk's `-drive` line, so
+# a delete inside the guest reaches the host's overlay. That is the whole mechanism, and it is why
+# removing the file here shrinks the artifact rather than only freeing space the guest could reuse.
 #
-# SO THE SNAPSHOT IS WHAT THIS STAGE DELETES. `diskutil apfs listSnapshots` names it, `tmutil
-# thinlocalsnapshots` is what macOS documents for local snapshots, and `diskutil apfs deleteSnapshot`
-# removes it by name. The step prints the list BEFORE and AFTER so the log says whether it worked -
-# a boot that still shows the Setup Assistant is then a snapshot that survived, not a guess.
-step "the install left an apfs snapshot, and macOS boots from it"
-  ssh "diskutil apfs listSnapshots / 2>&1 | head -20; echo '--- volume ---'; diskutil apfs list 2>&1 | grep -iE 'snapshot|Capacity In Use' | head -10"
+# WHAT IS REMOVED, AND WHY EACH IS SAFE:
+#
+#	sleepimage        this image offers no hibernation and macOS recreates it if it ever wants one
+#	swapfiles         matched to guest RAM and recreated on demand by `dynamic_pager`
+#	local snapshots   Time Machine's, purgeable by definition, and `tmutil` reports any it skips
+#
+# `df -h /` IS PRINTED BY THE STEP ITSELF, so the log says whether it worked instead of leaving the
+# next reader to infer it from an artifact 12 GiB too large.
+step "give the overlay back the space the guest spent"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'rm -f /private/var/vm/sleepimage; rm -f /private/var/vm/swapfile*; for s in $(tmutil listlocalsnapshots / 2>/dev/null | sed -n \"s/^com\\.apple\\.TimeMachine.*\\.\\(.*\\)$/\\1/p\"); do tmutil deletelocalsnapshots \"$s\" 2>/dev/null; done; sync; df -h / | tail -1'"
+  timeout 300
 
 
-step "delete the snapshot the installer made"
-  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S sh -c 'diskutil apfs listSnapshots / 2>/dev/null | sed -n \"s/.*Name: *//p\" | while read n; do [ -n \"$n\" ] && diskutil apfs deleteSnapshot / -name \"$n\"; done' 2>&1 | tail -12; echo '--- after ---'; diskutil apfs listSnapshots / 2>&1 | head -10"
+# THE SEALED SYSTEM SNAPSHOT IS NOT LEFTOVER, AND THIS STAGE MUST NOT TRY TO DELETE IT.
+#
+# MEASURED on run 45921917406, step 62/69 - the attempt, and the answer:
+#
+#	Snapshot:            55B3E243-9415-4B9F-8D34-29FB1C976510
+#	Name:                com.apple.os.update-C3E67B36246419E7...
+#	Snapshot Mount Point: /
+#	Snapshot Sealed:      Yes
+#	Deleting APFS Snapshot ... Error: -69529: Unable to delete the given APFS Snapshot
+#
+# `com.apple.os.update-<sha>` IS THE SEALED SYSTEM VOLUME SNAPSHOT - the thing macOS boots from by
+# design, not a residue the installer forgot. Apple's own documentation and every report of -69529 say
+# the same: it cannot be deleted while it is the booted snapshot, and it is not meant to be. An earlier
+# version of this file tried, and the try is what the log above records.
+#
+# SO THE STEP REPORTS IT AND STOPS. The list is still worth printing on every run: it is the one line
+# that separates "the disk has a system snapshot, as macOS requires" from "the disk has an extra copy
+# of the system", and the two look identical in a file listing.
+step "what the disk's apfs snapshot is, and that it must stay"
+  ssh "diskutil apfs listSnapshots / 2>&1 | head -14; echo '--- why it stays ---'; diskutil apfs list 2>&1 | grep -iE 'Sealed|Mount Point|Capacity In Use' | head -6"
 
 
 # THE MENU BAR SHUTS THE GUEST DOWN, BECAUSE THAT IS THE ONLY SHUTDOWN macOS HONOURS HERE.
