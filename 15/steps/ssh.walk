@@ -939,9 +939,31 @@ step "give the overlay back the space the guest spent"
 #
 # THE FILE IS REMOVED EVEN IF `dd` ITSELF FAILS, which is why the `rm` is a separate command and not
 # chained with `&&`: a half-written file left behind would be worse than the space it was meant to free.
-step "write zeros over the free space, so the host can drop those blocks"
-  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'echo before; df -h / | tail -1; dd if=/dev/zero of=/private/var/vm/zerofill bs=1m 2>/dev/null; rm -f /private/var/vm/zerofill; sync; echo after; df -h / | tail -1'"
-  timeout 900
+# NOTHING IS ZERO-FILLED HERE. `macos26` HAS NEVER DONE IT AND PUBLISHES 16407 MiB.
+#
+# THIS FILE HAD A `dd` THAT WROTE ZEROS OVER THE FREE SPACE, AND IT WAS THE WRONG IDEA FOR A REASON
+# THAT IS IN ITS OWN LOG. MEASURED, run 45934122711 step 64/72:
+#
+#	before
+#	/dev/disk2s4s1   128Gi    10Gi   106Gi     9%    /
+#	after
+#	/dev/disk2s4s1   128Gi    10Gi   106Gi     9%    /
+#
+# THE `dd` CHANGED NOTHING, TWICE: on `/private/var/vm/` (the sealed system volume, which has no room
+# to give) and on `/System/Volumes/Data`. Writing zeros is also exactly what `qemu-img convert -c`
+# does NOT need - it skips a block that is a HOLE, and a hole is what `discard=unmap` creates, not what
+# a `dd` creates.
+#
+# `macos/26/steps/ssh.walk` IS THE REFERENCE AND IT HAS NO CLEANUP AT ALL. It boots, drives the wizard,
+# turns Remote Login on, and stops - no `rm`, no `dd`, no `tmutil`, no `pmset`. It publishes 16407 MiB
+# from a 33618 MiB base. THAT IS THE SHAPE THIS FILE NOW TAKES: the deletes this walk really needs are
+# the ones the wizard itself makes, and `discard=unmap` on the `-drive` line is what turns them into
+# holes the publish step can drop.
+#
+# WHAT IS STILL DONE, AND ONLY THIS: the ONE file this disk writes that no other stage wants - the
+# hibernation image - is removed and hibernation is switched off, so the product does not carry 12 GiB
+# of sleep state into every later stage. That is a product decision, not a shrinking trick, and both
+# steps print their own evidence.
 
 
 # THE SEALED SYSTEM SNAPSHOT IS NOT LEFTOVER, AND THIS STAGE MUST NOT TRY TO DELETE IT.
