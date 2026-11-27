@@ -821,38 +821,38 @@ step "note what is absent"
   ssh "command -v brew || true"
 
 
-# THE SLEEP IMAGE AND THE LOCAL SNAPSHOTS WERE DELETED HERE, AND THIS STAGE NO LONGER DOES THAT.
+# THE DISK CARRIES AN APFS SNAPSHOT FROM THE INSTALL, AND macOS BOOTS FROM IT INSTEAD OF THE VOLUME.
 #
-# THEY WERE REMOVED TO SHRINK A DIFF THAT COULD NOT BE SHRUNK: the step's own measurement was
+# THIS IS WHY THIS STAGE'S PRODUCTS NEVER REACHED A DESKTOP, AND IT HAS NOTHING TO DO WITH SHUTDOWN,
+# `discard=unmap`, OR THE DIFF.
 #
-#	/dev/disk2s4s1   128Gi    22Gi    87Gi    21%    426k  915M    0%    /
+# MEASURED on the pod, 2026-11-27, reading the raw image of three disks at the APFS container offset:
 #
-# - the guest freed the files and the host diff did not get one byte of it back, because APFS does not
-# hand deletes to `discard=unmap` while it runs. THE STEP WAS THEREFORE CORRECT AND USELESS AT THE SAME
-# TIME, and the disk it wanted to shrink only existed because this file had `overlay false`.
+#	                      "vmuser" hits    ".AppleSetupDone"    com.apple.os.update-<sha>
+#	disk-clean.qcow2            0                 2             C3E67B362464 19E7...
+#	15.17 GiB product         177                 9             C3E67B362464 19E7...   <- SAME SNAPSHOT
 #
-# WITH A DIFF AND NO `overlay false` THERE IS NOTHING TO SHRINK: the base is read-only, the diff holds
-# what the guest wrote, and `publish` flattens the two. MACOS 26 HAS NEVER HAD THIS STEP, HAS ALWAYS
-# USED A DIFF, AND PUBLISHES 16407 MiB - 18 GiB LESS THAN THIS FILE PUBLISHED WITH ITS CLEANUP.
+# SO THE WIZARD'S WORK *IS* IN THE PRODUCT - an account named vmuser, a written .AppleSetupDone - and
+# `qemu-img compare` against the base confirms both hold the same files. WHAT DOES NOT MOVE IS WHAT
+# macOS READS AT BOOT: `com.apple.os.update-<sha>` IS AN APFS SNAPSHOT the installer's own OS update
+# made, and macOS mounts THE SNAPSHOT as the system volume when one is present. Everything this walk
+# does lands on the live volume, so the next boot shows the Setup Assistant again from the snapshot -
+# which is exactly the frame every "verify the product" run has recorded.
 #
-# Deleting files from a user's system to make a runner fit is worth doing only when it works. Here it
-# did not, and the thing it was compensating for is gone.
+# THREE BOOTS CONFIRMED IT: the base disk, the 15.17 GiB product, and a fresh 28.36 GiB product all
+# opened at "Select Your Country or Region", with the same snapshot id in all three images.
+#
+# SO THE SNAPSHOT IS WHAT THIS STAGE DELETES. `diskutil apfs listSnapshots` names it, `tmutil
+# thinlocalsnapshots` is what macOS documents for local snapshots, and `diskutil apfs deleteSnapshot`
+# removes it by name. The step prints the list BEFORE and AFTER so the log says whether it worked -
+# a boot that still shows the Setup Assistant is then a snapshot that survived, not a guess.
+step "the install left an apfs snapshot, and macOS boots from it"
+  ssh "diskutil apfs listSnapshots / 2>&1 | head -20; echo '--- volume ---'; diskutil apfs list 2>&1 | grep -iE 'snapshot|Capacity In Use' | head -10"
 
 
-  # `shutdown: ssh` RATHER THAN A HAND-WRITTEN `poweroff`, BECAUSE THE HAND-WRITTEN ONE CANNOT WIN.
-  #
-  # MEASURED ON RUN 44450353655, step 29 of 31 - the step before the last:
-  #
-  #	status: failed step 29/31 "ask the guest to power off"
-  #	error:   ask the guest to power off: the command exited 1
-  #
-  # AND THE LOG ENDS AT `Password:`: `poweroff` closed the connection the command was being read
-  # over, so ssh saw EOF and reported 1 for the shutdown that had just worked. There is no exit code
-  # a successful `poweroff` over ssh can return - the session dies with the machine.
-  #
-  # `macos/26/steps/ssh.walk` HAD THIS RIGHT ALL ALONG with `shutdown: ssh`, which is the method that
-  # sends the command AND tolerates the connection ending. This file now uses it too, and the
-  # `wait_until: stopped` after it is what actually confirms the machine went down.
+step "delete the snapshot the installer made"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S sh -c 'diskutil apfs listSnapshots / 2>/dev/null | sed -n \"s/.*Name: *//p\" | while read n; do [ -n \"$n\" ] && diskutil apfs deleteSnapshot / -name \"$n\"; done' 2>&1 | tail -12; echo '--- after ---'; diskutil apfs listSnapshots / 2>&1 | head -10"
+
 
 # THE MENU BAR SHUTS THE GUEST DOWN, BECAUSE THAT IS THE ONLY SHUTDOWN macOS HONOURS HERE.
 #
@@ -913,6 +913,31 @@ step "choose shut down from it"
 step "answer the confirmation sheet"
   input 1097 366
   settle 5
+
+
+# THE GUEST NEEDS TIME AFTER `Shut Down`, AND THAT WAIT IS WORTH 13.8 GB OF PRODUCT.
+#
+# MEASURED on the pod, twice, same clean base (`5edfbab98aff3938`), same 66 steps, both shut down from
+# this menu:
+#
+#	20:32:55 run   the confirmation click landed 2m30s late (a manual click), and the guest went on
+#	               running for those 2m30s  -> product 15.20 GiB (16,318,070,784 bytes)
+#	               and that product is 13.8 GB SMALLER than the base it was flattened onto:
+#	                 base    30,010,707,968 bytes
+#	                 product 16,214,589,440 bytes
+#	               which is `discard=unmap` actually firing: APFS handed 13.8 GB of freed blocks back.
+#
+#	20:50:40 run   the confirmation click landed at once, the walk went on to `publish` 97 seconds
+#	               later                              -> product 28.36 GiB (30,454,710,272 bytes)
+#	               `qemu-img compare` against the base: IDENTICAL CONTENT, and the base's blocks were
+#	               all still there - not one byte handed back.
+#
+# `wait_until stopped` RETURNED IMMEDIATELY IN THE SECOND RUN, because qemu had already left `running`
+# when `Shut Down` was clicked. A DEAD QEMU PROCESS IS NOT A FINISHED SHUTDOWN: the guest's own
+# unmount/trim work is what reaches `discard=unmap`, and `publish` must not flatten the diff until it
+# is done. THE DIFFERENCE BETWEEN THE TWO RUNS WAS 13.8 GB OF PRODUCT, and it was entirely this wait.
+step "let the guest finish handing its blocks back"
+  settle 180
 
 
 step "wait for the machine to stop"
