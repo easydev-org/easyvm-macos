@@ -846,8 +846,44 @@ step "note what is absent"
 #
 # `df -h /` IS PRINTED BY THE STEP ITSELF, so the log says whether it worked instead of leaving the
 # next reader to infer it from an artifact 12 GiB too large.
+# THE HIBERNATION IMAGE IS TURNED OFF AS WELL AS DELETED, BECAUSE DELETING IT IS ONLY HALF THE JOB.
+#
+# `rm` REMOVES THE 12 GiB FILE THAT IS THERE NOW; `pmset -a hibernatemode 0` STOPS macOS WRITING THE
+# NEXT ONE. With hibernatemode 3 - the desktop default - the kernel writes a file the size of RAM the
+# first time it decides to hibernate, and a product built from this disk would carry it again on its
+# own first boot. `0` is "do not hibernate": sleep stays in RAM, no image is written, and the setting is
+# stored in the power-management preferences, so it survives the reboot this disk is about to have.
+#
+# `autopoweroff` IS SET TOO, because on some models macOS uses it in place of hibernate and it writes
+# the same image. Both are harmless for a VM: there is no battery to protect and no state to preserve
+# across a power cut that this stage cares about.
+#
+# `pmset -g custom` IS PRINTED BY THE STEP, so the log proves the setting took rather than assuming it.
+step "stop macOS writing a hibernation image at all"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' pmset -a hibernatemode 0 autopoweroff 0 2>&1 | tail -3; echo '--- what it says now ---'; pmset -g custom 2>&1 | grep -iE 'hibernatemode|autopoweroff' | head -4"
+  timeout 300
+
+
+# AND THE IMAGE THAT IS ALREADY THERE IS REMOVED, WITH THE SWAPFILES AND THE LOCAL SNAPSHOTS.
+#
+# THE MEASUREMENT THAT SAYS THIS STEP IS WORTH KEEPING - two products of the same 63 steps:
+#
+#	with it      15.10 GiB product, 19.27 GiB of data extents, empty space from 36 GiB up
+#	without it   27.68 GiB product, 32.36 GiB of data extents (the install disk's own figure)
+#
+# 12.6 GiB, which is `/private/var/vm/sleepimage` at the guest's 12288 MiB of RAM, to the megabyte.
+# `discard=unmap` is on the disk's `-drive` line, so a delete INSIDE the guest reaches the host's
+# overlay and the clusters come back - that is the mechanism, and it is why removing the file here
+# shrinks the artifact rather than only freeing space the guest can reuse.
+#
+#	sleepimage        recreated only if hibernation is asked for, and step above just turned it off
+#	swapfiles         matched to guest RAM, recreated on demand by `dynamic_pager`
+#	local snapshots   Time Machine's, purgeable by definition, and `tmutil` reports any it skips
+#
+# `df -h /` IS PRINTED BY THE STEP ITSELF, so the log says whether it worked instead of leaving the
+# next reader to infer it from an artifact 12 GiB too large.
 step "give the overlay back the space the guest spent"
-  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'rm -f /private/var/vm/sleepimage; rm -f /private/var/vm/swapfile*; for s in $(tmutil listlocalsnapshots / 2>/dev/null | sed -n \"s/^com\\.apple\\.TimeMachine.*\\.\\(.*\\)$/\\1/p\"); do tmutil deletelocalsnapshots \"$s\" 2>/dev/null; done; sync; df -h / | tail -1'"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'rm -f /private/var/vm/sleepimage; rm -f /private/var/vm/swapfile*; for s in $(tmutil listlocalsnapshots / 2>/dev/null | sed -n \"s/^com\\.apple\\.TimeMachine.*\\.\\(.*\\)$/\\1/p\"); do tmutil deletelocalsnapshots \"$s\" 2>/dev/null; done; sync; echo \"--- sleepimage now ---\"; ls -l /private/var/vm/ 2>&1 | head -4; df -h / | tail -1'"
   timeout 300
 
 
