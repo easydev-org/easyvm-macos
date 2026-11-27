@@ -43,7 +43,7 @@ step "boot the disk"
     #
     # WHAT COMES BACK WITH THE DIFF: a failed run leaves the published disk untouched, and the guest's
     # TRIM cannot reach the base. Both were given away here for a peak that no longer exists.
-    args [["-m", "12288"], ["-cpu", "Skylake-Client-v4,vendor=GenuineIntel,vmx=off,vmware-cpuid-freq=on,-pdpe1gb,+invtsc,+ssse3,+sse4.2,+popcnt,+avx,+avx2,+aes,+fma,+bmi1,+bmi2,+smep,+xsave,+xsaveopt,+xgetbv1,+movbe,+rdrand,check"], ["-smp", "4,sockets=1,dies=1,cores=4,threads=1"], ["-drive", "if=pflash,format=raw,readonly=on,file=macos.rom"], ["-drive", "if=pflash,format=raw,file=macos.vars"], ["-drive", "file=boot.img,format=raw,if=none,id=oc"], ["-device", "virtio-blk-pci,drive=oc,bootindex=0"], ["-chardev", "socket,id=qga0,path=qga.sock,server=on,wait=off"], ["-device", "isa-serial,chardev=qga0"], ["-device", "qemu-xhci,id=xhci"], ["-device", "usb-tablet,bus=xhci.0"], ["-device", "usb-kbd,bus=xhci.0"], ["-drive", "file=disk.qcow2,if=none,format=qcow2,discard=unmap,id=target"], ["-device", "virtio-blk-pci,drive=target,bootindex=1"], ["-global", "ICH9-LPC.disable_s3=1"], ["-global", "ICH9-LPC.disable_s4=1"], ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"], ["-rtc", "base=utc"], ["-smbios", "type=2"], ["-device", "vmware-svga"], ["-audiodev", "none,id=snd0"], ["-device", "usb-audio,bus=xhci.0,audiodev=snd0"], ["-device", "isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"], ["-netdev", "tap,id=net0,ifname=qemutap0,script=no,downscript=no"], ["-device", "virtio-net-pci,netdev=net0,mac=52:54:00:56:4d:01,romfile=,host_mtu=1450"]]
+    args [["-m", "12288"], ["-cpu", "Skylake-Client-v4,vendor=GenuineIntel,vmx=off,vmware-cpuid-freq=on,-pdpe1gb,+invtsc,+ssse3,+sse4.2,+popcnt,+avx,+avx2,+aes,+fma,+bmi1,+bmi2,+smep,+xsave,+xsaveopt,+xgetbv1,+movbe,+rdrand,check"], ["-smp", "4,sockets=1,dies=1,cores=4,threads=1"], ["-drive", "if=pflash,format=raw,readonly=on,file=macos.rom"], ["-drive", "if=pflash,format=raw,file=macos.vars"], ["-drive", "file=boot.img,format=raw,if=none,id=oc"], ["-device", "virtio-blk-pci,drive=oc,bootindex=0"], ["-chardev", "socket,id=qga0,path=qga.sock,server=on,wait=off"], ["-device", "isa-serial,chardev=qga0"], ["-device", "qemu-xhci,id=xhci"], ["-device", "usb-tablet,bus=xhci.0"], ["-device", "usb-kbd,bus=xhci.0"], ["-drive", "file=disk.qcow2,if=none,format=qcow2,discard=unmap,detect-zeroes=unmap,id=target"], ["-device", "virtio-blk-pci,drive=target,bootindex=1"], ["-global", "ICH9-LPC.disable_s3=1"], ["-global", "ICH9-LPC.disable_s4=1"], ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"], ["-rtc", "base=utc"], ["-smbios", "type=2"], ["-device", "vmware-svga"], ["-audiodev", "none,id=snd0"], ["-device", "usb-audio,bus=xhci.0,audiodev=snd0"], ["-device", "isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"], ["-netdev", "tap,id=net0,ifname=qemutap0,script=no,downscript=no"], ["-device", "virtio-net-pci,netdev=net0,mac=52:54:00:56:4d:01,romfile=,host_mtu=1450"]]
     timeout 900
 # THE WIZARD IS A FIXED SEQUENCE, SO IT IS WRITTEN AS ONE - ONE PAGE PER STEP, NO LOOP.
 #
@@ -885,6 +885,36 @@ step "stop macOS writing a hibernation image at all"
 step "give the overlay back the space the guest spent"
   ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'rm -f /private/var/vm/sleepimage; rm -f /private/var/vm/swapfile*; for s in $(tmutil listlocalsnapshots / 2>/dev/null | sed -n \"s/^com\\.apple\\.TimeMachine.*\\.\\(.*\\)$/\\1/p\"); do tmutil deletelocalsnapshots \"$s\" 2>/dev/null; done; sync; echo \"--- sleepimage now ---\"; ls -l /private/var/vm/ 2>&1 | head -4; df -h / | tail -1'"
   timeout 300
+
+
+# APFS DOES NOT TELL THE HOST ABOUT A DELETE, SO THE FREED BLOCKS ARE ZEROED INSTEAD.
+#
+# MEASURED on runs 45921917406 and 45928114170 - the guest's own `df` against the artifact it produced:
+#
+#	                        guest / used      overlay written      product
+#	15848dd (no cleanup)    35.0 GB           16,500 MiB           28,339 MiB
+#	3cf7179 (rm+no hib.)    10 GiB            21,450 MiB           31,599 MiB
+#
+# THE GUEST FREED 25 GB AND THE ARTIFACT GREW. `discard=unmap` alone cannot help: APFS is copy-on-write
+# and answers a delete by dropping a reference, not by sending the host a discard. The old run that
+# produced 15.10 GiB did not trim either - it happened to write far less in the first place.
+#
+# TWO THINGS ARE NEEDED, AND THIS FILE NOW HAS BOTH:
+#
+#	detect-zeroes=unmap on the disk's `-drive` line   qemu un-maps a block when it is WRITTEN as zeros
+#	this step writes zeros over the free space        so the freed blocks ARE written as zeros
+#
+# `diskutil secureErase freespace` CANNOT DO IT on APFS - measured, it answers
+# `-69489: Secure erase by writing a run of bytes to an APFS Volume makes no sense due to its possibly
+# unbounded size`. `dd` can: one file of zeros, written until the volume is full, then deleted. The
+# blocks are zero when qemu sees them, so they are dropped from the overlay even though APFS never
+# issued a discard for them.
+#
+# THE FILE IS REMOVED EVEN IF `dd` ITSELF FAILS, which is why the `rm` is a separate command and not
+# chained with `&&`: a half-written file left behind would be worse than the space it was meant to free.
+step "write zeros over the free space, so the host can drop those blocks"
+  ssh "printf '%s\\n' \"{{ password }}\" | sudo -S -p '' sh -c 'echo before; df -h / | tail -1; dd if=/dev/zero of=/private/var/vm/zerofill bs=1m 2>/dev/null; rm -f /private/var/vm/zerofill; sync; echo after; df -h / | tail -1'"
+  timeout 900
 
 
 # THE SEALED SYSTEM SNAPSHOT IS NOT LEFTOVER, AND THIS STAGE MUST NOT TRY TO DELETE IT.
