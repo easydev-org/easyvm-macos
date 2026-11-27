@@ -20,29 +20,34 @@ step "the media this stage boots from is already on disk"
 step "boot the disk"
   boot
     machine "q35,accel=kvm,vmport=off"
-    # THE WRITES GO TO A THROWAWAY DIFF, LIKE EVERY OTHER STAGE HERE.
+    # THIS STAGE WRITES STRAIGHT TO THE DISK, BECAUSE A DIFF MAKES A PRODUCT THAT CANNOT SHRINK.
     #
-    # THIS FILE USED `overlay false`, AND THE PUBLISHED DISK PAID FOR IT. MEASURED, the same two stages
-    # side by side:
+    # THE ARITHMETIC IS THE WHOLE REASON. With a diff, `publish` flattens BASE ∪ DIFF:
+    #
+    #	base                     30,010,703,872 bytes  (27.95 GiB, the installer's own disk)
+    #	every product so far     28,339 MiB / 31,599 MiB / 33,893 MiB   - never below the base
+    #
+    # A UNION OF A SET WITH ANYTHING IS AT LEAST THE SET. No amount of deleting inside the guest can
+    # make a diff-over-base artifact smaller than the base it is flattened onto, which is exactly what
+    # the four runs measured: the guest's `df -h /` said 10 GiB used while the product said 31.6 GiB.
+    #
+    # WITH `overlay false` THE GUEST'S WRITES AND ITS DELETES BOTH LAND ON THE ONE FILE, and `-drive`
+    # carries `discard=unmap,detect-zeroes=unmap`, so the blocks the guest frees leave the product.
+    # The file that gets compressed is then the disk's OWN usage, not the disk plus a second copy of
+    # everything the guest rewrote.
+    #
+    # THE RECORD THAT USED TO ARGUE THE OTHER WAY IS KEPT, because what it measured was a different
+    # mechanism - no `detect-zeroes=unmap` and no cleanup inside the guest:
     #
     #	             boot                 base before   base after   published
     #	macos 15     overlay false        28620 MiB     40981 MiB    34589 MiB
-    #	macos 26     diff over the base   33618 MiB     33618 MiB    16407 MiB
     #
-    # MACOS 26'S BASE IS 5 GiB LARGER AND ITS PRODUCT IS 18 GiB SMALLER, because with a diff the base
-    # is never written and the published file is the compressed flatten of a diff that holds only what
-    # the guest actually added. With `overlay false` every write lands in the base, `discard=unmap`
-    # reaches the base, and the file that gets compressed is 41 GiB of mostly-free space.
+    # 40981 MiB IS WHAT A DISK LOOKS LIKE WHEN NOTHING EVER UN-MAPS IT, and that is the half this file
+    # now supplies. The peak it was turned off for is also gone: the recording ends before `publish`.
     #
-    # THE REASON IT WAS TURNED OFF WAS A PEAK, NOT A RESULT: at the time this stage published 42.2 GiB
-    # of output and the base plus a live diff plus that output did not fit in 84 GiB. THAT PEAK IS GONE
-    # FOR A REASON THAT HAS NOTHING TO DO WITH OVERLAYS: the recording now ends before `publish`, and a
-    # diff that is 12 GiB smaller than the growth this file used to cause leaves the same three files
-    # comfortably inside the runner. Measured on macos 26, which has always used a diff and has never
-    # needed the room this file gave up its guarantees for.
-    #
-    # WHAT COMES BACK WITH THE DIFF: a failed run leaves the published disk untouched, and the guest's
-    # TRIM cannot reach the base. Both were given away here for a peak that no longer exists.
+    # WHAT IS GIVEN UP: a failed run now writes through to the disk it booted. That is acceptable here
+    # because the base is pulled fresh from the registry on every run.
+    overlay false
     args [["-m", "12288"], ["-cpu", "Skylake-Client-v4,vendor=GenuineIntel,vmx=off,vmware-cpuid-freq=on,-pdpe1gb,+invtsc,+ssse3,+sse4.2,+popcnt,+avx,+avx2,+aes,+fma,+bmi1,+bmi2,+smep,+xsave,+xsaveopt,+xgetbv1,+movbe,+rdrand,check"], ["-smp", "4,sockets=1,dies=1,cores=4,threads=1"], ["-drive", "if=pflash,format=raw,readonly=on,file=macos.rom"], ["-drive", "if=pflash,format=raw,file=macos.vars"], ["-drive", "file=boot.img,format=raw,if=none,id=oc"], ["-device", "virtio-blk-pci,drive=oc,bootindex=0"], ["-chardev", "socket,id=qga0,path=qga.sock,server=on,wait=off"], ["-device", "isa-serial,chardev=qga0"], ["-device", "qemu-xhci,id=xhci"], ["-device", "usb-tablet,bus=xhci.0"], ["-device", "usb-kbd,bus=xhci.0"], ["-drive", "file=disk.qcow2,if=none,format=qcow2,discard=unmap,detect-zeroes=unmap,id=target"], ["-device", "virtio-blk-pci,drive=target,bootindex=1"], ["-global", "ICH9-LPC.disable_s3=1"], ["-global", "ICH9-LPC.disable_s4=1"], ["-global", "ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"], ["-rtc", "base=utc"], ["-smbios", "type=2"], ["-device", "vmware-svga"], ["-audiodev", "none,id=snd0"], ["-device", "usb-audio,bus=xhci.0,audiodev=snd0"], ["-device", "isa-applesmc,osk=ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc"], ["-netdev", "tap,id=net0,ifname=qemutap0,script=no,downscript=no"], ["-device", "virtio-net-pci,netdev=net0,mac=52:54:00:56:4d:01,romfile=,host_mtu=1450"]]
     timeout 900
 # THE WIZARD IS A FIXED SEQUENCE, SO IT IS WRITTEN AS ONE - ONE PAGE PER STEP, NO LOOP.
