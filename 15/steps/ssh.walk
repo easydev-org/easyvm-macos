@@ -78,6 +78,28 @@ step "boot the disk"
 # MEASURED on the local probe: `boot:` returns as soon as qemu is up (412 ms), and the frame two
 # seconds later is still black. A `settle` here has to cover the whole boot, because the page it is
 # waiting for cannot appear until the boot is done.
+# THE OPENCORE PICKER CAN APPEAR FIRST WHEN THE DISK IS WRITTEN DIRECTLY, AND RETURN CHOOSES `main`.
+#
+# MEASURED on run 45931943076 - the first run with `overlay false`. The guest reached OpenCore's own
+# boot picker and stayed there, with one entry on screen:
+#
+#	[ main ]
+#	REL-105 2025-07-07
+#
+# and the walk, which was waiting for "select your country or region", saw nothing but the picker for
+# ninety attempts. The console says what led there:
+#
+#	BdsDxe: loading Boot0001 "UEFI Misc Device" from PciRoot(0x0)/Pci(0x1,0x0)
+#	apfs.efi: LocateProtocol(AppleLogging) succeeded
+#
+# SO A RETURN IS SENT BEFORE THE PAGE IS WAITED FOR. It picks the entry that is already highlighted, and
+# it is harmless in the case this file used to rely on - with a diff, OpenCore boots straight through
+# and the keystroke is a no-op on a screen that is already past.
+step "let the boot picker through, if it is up"
+  input ret
+  settle 5
+
+
 step "wait for the country or region page"
   repeat
     do
